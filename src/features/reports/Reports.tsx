@@ -1,182 +1,414 @@
-import React, { useState, useEffect, useContext } from "react";
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell 
+// src/features/reports/Reports.tsx
+import React, { useState } from "react";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
-import { Calendar, Filter } from "lucide-react";
-import { format, subMonths } from "date-fns";
-import { zendeskApi } from "../../services/zendesk";
+import { Download, ChevronRight } from "lucide-react";
 
-// Add TypeScript interfaces
-interface Agent {
-  id: number;
-  name: string;
-  tickets: number;
-}
-
-interface TicketStats {
+// ------------------------------------
+// Types & Mock data
+// ------------------------------------
+interface TicketsData {
   total: number;
   pending: number;
-  solved: number;
-  avgCallDuration: number;
+  avgCallDuration: number; // seconds
+  percentageChange: number;
+  pendingPercentageChange: number;
 }
+const mockTicketsData: TicketsData = {
+  total: 256,
+  pending: 72,
+  avgCallDuration: 334,
+  percentageChange: 12,
+  pendingPercentageChange: -7,
+};
 
-interface ActivityData {
+interface ActivityPoint {
   name: string;
   tickets: number;
 }
+const mockMonthlyActivity: ActivityPoint[] = [
+  { name: "JAN", tickets: 100 },
+  { name: "FEB", tickets: 140 },
+  { name: "MAR", tickets: 135 },
+  { name: "APR", tickets: 240 },
+  { name: "MAJ", tickets: 275 },
+  { name: "JUN", tickets: 200 },
+  { name: "JUL", tickets: 230 },
+  { name: "AUG", tickets: 100 },
+  { name: "SEP", tickets: 270 },
+  { name: "OKT", tickets: 330 },
+  { name: "NOV", tickets: 380 },
+  { name: "DEC", tickets: 250 },
+];
 
-interface DashboardData {
-  ticketStats: TicketStats;
-  monthlyActivity: ActivityData[];
-  topAgents: Agent[];
+interface FormData {
+  name: string;
+  percentage: number;
 }
+const mockFormData: FormData[] = [
+  { name: "Opret ny bruger", percentage: 67 },
+  { name: "Glemt Brugernavn", percentage: 26 },
+  { name: "Fejl i database", percentage: 9 },
+];
 
-const COLORS = ["#4F46E5", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
+interface HistoryData {
+  status: string;
+  count: number;
+}
+const mockTicketHistory: HistoryData[] = [
+  { status: "Åbne", count: 77 },
+  { status: "Løst", count: 107 },
+  { status: "I Bero", count: 72 },
+];
 
+interface Agent {
+  name: string;
+  resolved: number;
+  initial: string;
+}
+const mockAgents: Agent[] = [
+  { name: "Steen Andersen", resolved: 15, initial: "S" },
+  { name: "Eva Hansen",     resolved:  9, initial: "E" },
+  { name: "Peter Mortensen",resolved: 11, initial: "P" },
+];
+
+interface Trigger {
+  name: string;
+  count: number;
+  trend: "up" | "down";
+}
+const mockTriggers: Trigger[] = [
+  { name: "Set Normal Prioritet",         count: 51, trend: "up"   },
+  { name: "Genåben Sideløbende Samtaler",  count: 12, trend: "down" },
+  { name: "Tildel ticket til Support Gruppe", count: 19, trend: "up" },
+  { name: "Forskningsudtræk tildeling",    count: 33, trend: "down" },
+];
+
+interface DonutSlice {
+  name: string;
+  value: number;
+  color: string;
+}
+const donutData: DonutSlice[] = [
+  { name: "Afbrudt",  value: 0.32, color: "#F97066" },
+  { name: "Ubesvaret",value: 0.38, color: "#6366F1" },
+  { name: "Besvaret", value: 0.30, color: "#2DD4BF" },
+];
+const totalCalls = 498;
+
+// For heatmap we keep your random logic
+interface HeatCell { month: string; hour: string; intensity: string; }
+type HeatRow = HeatCell[];
+// ------------------------------------
+// Reports component
+// ------------------------------------
 export const Reports: React.FC = () => {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [dateRange, setDateRange] = useState({
-    startDate: format(subMonths(new Date(), 3), "yyyy-MM-dd"),
-    endDate: format(new Date(), "yyyy-MM-dd")
-  });
-  
-  // Check if dark mode is active
-  const isDarkMode = document.documentElement.classList.contains('dark');
+  const [timeFrame, setTimeFrame] = useState<"month" | "week" | "year">("month");
+  const frameOptions = [
+    { label: "Måned", value: "month" },
+    { label: "Uge",   value: "week"  },
+    { label: "År",    value: "year"  },
+  ];
+  const activityData = mockMonthlyActivity;
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        setIsLoading(true);
-        const stats = await zendeskApi.getDashboardStats(dateRange);
-        setData(stats);
-        setIsLoading(false);
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-        setIsLoading(false);
-      }
-    }
-    
-    fetchData();
-  }, [dateRange]);
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  if (isLoading || !data) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-2 text-slate-600 dark:text-slate-400">Loading dashboard data...</p>
-        </div>
-      </div>
+  const [heatmapData] = useState<HeatRow[]>(() => {
+    const intensities = [
+      "bg-indigo-100","bg-indigo-200","bg-indigo-300",
+      "bg-indigo-400","bg-indigo-500","bg-indigo-600",
+    ];
+    const months = ["JAN","FEB","MAR","APR","MAJ","JUN","JUL","AUG","SEP","OKT","NOV","DEC"];
+    const hours = ["9","10","11","12","13","14"];
+    return months.map((m) =>
+      hours.map((h) => ({
+        month: m,
+        hour: h,
+        intensity: intensities[Math.floor(Math.random()*intensities.length)],
+      }))
     );
-  }
+  });
 
   return (
-    <div className="space-y-6">
-      {/* Header with date filter */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Rapporter</h1>
-        
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center text-sm text-slate-600 dark:text-slate-400">
-            <Calendar size={16} className="mr-2" />
-            <span>
-              {format(new Date(dateRange.startDate), "dd MMM yyyy")} - {format(new Date(dateRange.endDate), "dd MMM yyyy")}
-            </span>
-          </div>
-          
-          <button className="inline-flex items-center px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700">
-            <Filter size={16} className="mr-2" />
-            Filter
-          </button>
-        </div>
+    <div className="p-6 bg-gray-50 space-y-6">
+
+      {/* Header */}
+      <div className="flex justify-between items-center border-b border-gray-200 pb-4">
+        <h1 className="text-2xl font-bold">Reports</h1>
+        <button className="inline-flex items-center px-4 py-2 border rounded-md shadow-sm text-sm bg-white hover:bg-gray-50">
+          <Download className="mr-2" /> Download
+        </button>
       </div>
-      
-      {/* Key metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4">
-          <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">Samlet antal tickets</h3>
-          <p className="text-2xl font-bold text-slate-900 dark:text-white">{data.ticketStats.total}</p>
-        </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4">
-          <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">I bero</h3>
-          <p className="text-2xl font-bold text-slate-900 dark:text-white">{data.ticketStats.pending}</p>
-        </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4">
-          <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">Løst</h3>
-          <p className="text-2xl font-bold text-slate-900 dark:text-white">{data.ticketStats.solved}</p>
-        </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4">
-          <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">Gns. opkaldsvarighed</h3>
-          <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatTime(data.ticketStats.avgCallDuration)}</p>
-        </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-4">
+        {[
+          { defaultValue: "lastMonth", options: ["Sidste 30 dage","Sidste 7 dage","Sidste år"] },
+          { defaultValue: "all",       options: ["Personer: Alle","Kun agenter","Kun administratorer"] },
+          { defaultValue: "all",       options: ["Emner: Alle","Tekniske problemer","Konto problemer"] },
+        ].map((sel,i) => (
+          <select
+            key={i}
+            defaultValue={sel.defaultValue}
+            className="w-64 px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {sel.options.map((opt,j)=>(
+              <option key={j} value={opt}>{opt}</option>
+            ))}
+          </select>
+        ))}
       </div>
-      
-      {/* Charts */}
+
+      {/* Top 2-col grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Monthly activity chart */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4">
-          <h2 className="text-lg font-medium mb-4 text-slate-900 dark:text-white">Aktivitet pr. måned</h2>
-          <div className="h-72 bg-slate-50 dark:bg-slate-900 rounded p-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.monthlyActivity}>
-                <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#374151" : "#E2E8F0"} />
-                <XAxis dataKey="name" stroke={isDarkMode ? "#94A3B8" : "#475569"} />
-                <YAxis stroke={isDarkMode ? "#94A3B8" : "#475569"} />
-                <Tooltip contentStyle={{ backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF', color: isDarkMode ? '#F1F5F9' : '#334155', borderColor: isDarkMode ? '#4B5563' : '#E2E8F0' }} />
-                <Bar dataKey="tickets" fill="#4F46E5" />
-              </BarChart>
-            </ResponsiveContainer>
+
+        {/* LEFT: Stats → Formularer → Historik */}
+        <div className="space-y-6">
+
+          {/* Stats */}
+          <div className="flex justify-between gap-4">
+            {[
+              {
+                label: "Samlede Tickets",
+                value: mockTicketsData.total,
+                change: `↑ ${mockTicketsData.percentageChange}%`,
+                changeClass: "text-red-500",
+              },
+              {
+                label: "I Bero Tickets",
+                value: mockTicketsData.pending,
+                change: `↓ ${Math.abs(mockTicketsData.pendingPercentageChange)}%`,
+                changeClass: "text-green-500",
+              },
+              {
+                label: "Gn. opkaldsvarighed",
+                value:
+                  `${Math.floor(mockTicketsData.avgCallDuration/60)}m ` +
+                  String(mockTicketsData.avgCallDuration%60).padStart(2,"0") + "s",
+                noChange:true,
+              },
+            ].map((c,i)=>(
+              <div
+                key={i}
+                className="flex-1 bg-white rounded-xl shadow-sm p-4 flex flex-col items-center"
+              >
+                <h3 className="text-sm text-gray-500 mb-2">{c.label}</h3>
+                <p className="text-3xl font-bold">{c.value}</p>
+                {!c.noChange && (
+                  <p className={`mt-1 text-sm font-medium ${c.changeClass}`}>
+                    {c.change}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Tickets formularer */}
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <h2 className="text-base font-medium mb-4">Tickets formularer</h2>
+            <div className="space-y-3">
+              {mockFormData.map((f,i)=>(
+                <div key={i}>
+                  <div className="flex justify-between mb-1">
+                    <span>{f.name}</span>
+                    <span>{f.percentage}%</span>
+                  </div>
+                  <div className="w-full bg-red-100 rounded-full h-2">
+                    <div
+                      className="h-2 rounded-full bg-green-500"
+                      style={{ width:`${f.percentage}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Ticket Historik */}
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <h2 className="text-base font-medium mb-4">Ticket Historik</h2>
+            <div className="space-y-3">
+              {mockTicketHistory.map((h,i)=>(
+                <div key={i}>
+                  <div className="flex justify-between mb-1">
+                    <span>{h.status}</span>
+                    <span>{h.count}</span>
+                  </div>
+                  <div className="w-full bg-red-100 rounded-full h-2">
+                    <div
+                      className="h-2 rounded-full bg-orange-500"
+                      style={{ width:`${(h.count/120)*100}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-        
-        {/* Top agents */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4">
-          <h2 className="text-lg font-medium mb-4 text-slate-900 dark:text-white">Brugere der har løst flest sager</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="h-64 bg-slate-50 dark:bg-slate-900 rounded p-2">
+
+        {/* RIGHT: Aktivitet → Opkald besvaret */}
+        <div className="space-y-6">
+
+          {/* Aktivitet chart */}
+          <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col h-60">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-sm text-gray-500">Aktivitet</h3>
+              <select
+                value={timeFrame}
+                onChange={e => setTimeFrame(e.target.value as any)}
+                className="text-indigo-600 font-medium text-sm focus:outline-none"
+              >
+                {frameOptions.map(o=>(
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-1">
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={data.topAgents}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={80}
-                    dataKey="tickets"
-                    nameKey="name"
-                  >
-                    {data.topAgents.map((entry: Agent, index: number) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={COLORS[index % COLORS.length]} 
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={{ backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF', color: isDarkMode ? '#F1F5F9' : '#334155', borderColor: isDarkMode ? '#4B5563' : '#E2E8F0' }} />
-                </PieChart>
+                <BarChart data={activityData} margin={{ left:0, right:16 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                  <XAxis dataKey="name" axisLine={false} tickLine={false}/>
+                  <YAxis axisLine={false} tickLine={false} width={32}/>
+                  <Tooltip/>
+                  <Bar dataKey="tickets" fill="#6366F1" radius={[4,4,0,0]} barSize={16}/>
+                </BarChart>
               </ResponsiveContainer>
             </div>
-            <div>
-              <ul className="divide-y divide-slate-200 dark:divide-slate-700 bg-slate-50 dark:bg-slate-900 rounded p-2">
-                {data.topAgents.map((agent: Agent, index: number) => (
-                  <li key={agent.id} className="py-3 flex items-center">
-                    <div className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                    <div className="flex-1">
-                      <p className="font-medium text-slate-900 dark:text-white">{agent.name}</p>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">{agent.tickets} tickets</p>
+          </div>
+
+          {/* Opkald besvaret */}
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <h2 className="text-base font-medium mb-4">Opkald besvaret</h2>
+            <div className="space-y-4">
+              {mockAgents.map((a,i)=>(
+                <div key={i} className="flex items-center">
+                  <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 mr-3">
+                    {a.initial}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium">{a.name}</p>
+                    <div className="w-full bg-gray-100 rounded-full h-2 mt-1">
+                      <div
+                        className="h-2 rounded-full bg-green-500"
+                        style={{
+                          width:
+                            a.name==="Steen Andersen" ? "75%" :
+                            a.name==="Eva Hansen"     ? "45%" :
+                            "55%",
+                        }}
+                      />
                     </div>
-                  </li>
-                ))}
-              </ul>
+                  </div>
+                  <span className="ml-3 font-medium">{a.resolved}</span>
+                </div>
+              ))}
             </div>
+          </div>
+
+        </div>
+      </div>
+
+{/* 3rd Row: Calls answered & Triggers */}
+   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+ 
+     {/* Aktive Triggers */}
+     <div className="bg-white rounded-xl shadow-sm p-4">
+       <h2 className="text-base font-medium mb-4">Aktive Triggers</h2>
+       <div className="space-y-4">
+         {mockTriggers.map((trigger, idx) => (
+           <div key={idx} className="flex justify-between items-center">
+             <span className="font-medium">{trigger.name}</span>
+             <div className="flex items-center">
+               <span className="mr-2 font-medium">{trigger.count}</span>
+               <span className={trigger.trend === "up" ? "text-green-500" : "text-red-500"}>
+                 {trigger.trend === "up" ? "▲" : "▼"}
+               </span>
+             </div>
+           </div>
+         ))}
+       </div>
+       <div className="mt-4 text-center">
+         <a href="#" className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800">
+           Vis alle triggers <ChevronRight size={16} className="ml-1"/>
+         </a>
+       </div>
+     </div>
+     </div>
+      {/* 4th Row: Heatmap & Donut */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Heatmap */}
+        <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col h-96">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-base font-medium">Opkald Volume (Heatmap)</h2>
+            <span>Alle opkald</span>
+          </div>
+          <div className="flex flex-1 overflow-auto">
+            <div className="flex flex-col mr-2">
+              {heatmapData.map((row,ri)=>(
+                <div key={ri} className="h-5 flex items-center text-xs">
+                  {row[0].month}
+                </div>
+              ))}
+            </div>
+            <div className="flex-1 overflow-auto">
+              <div className="grid grid-cols-6 gap-0.5">
+                {heatmapData.map((row,ri)=>
+                  row.map((cell,ci)=>(
+                    <div key={`${ri}-${ci}`} className={`${cell.intensity} h-5`}/>
+                  ))
+                )}
+              </div>
+              <div className="grid grid-cols-6 gap-0.5 mt-1 text-xs">
+                {heatmapData[0].map((cell,i)=>(
+                  <div key={i} className="text-center">{cell.hour}</div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Donut */}
+        <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col h-96">
+          <h2 className="text-base font-medium mb-4">Alle opkald</h2>
+          <div className="relative flex-1 flex items-center justify-center">
+            <ResponsiveContainer width="80%" height="80%">
+              <PieChart>
+                <Pie
+                  data={donutData}
+                  dataKey="value"
+                  nameKey="name"
+                  startAngle={90}
+                  endAngle={-270}
+                  innerRadius="60%"
+                  outerRadius="100%"
+                  paddingAngle={4}
+                >
+                  {donutData.map((s,i)=>(
+                    <Cell key={i} fill={s.color}/>
+                  ))}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="absolute text-center">
+              <p className="text-2xl font-bold">{totalCalls}</p>
+              <p className="text-xs text-gray-500">OPKALD</p>
+            </div>
+          </div>
+          <div className="mt-4 flex justify-center gap-4">
+            {donutData.map((s,i)=>(
+              <div key={i} className="flex items-center space-x-2">
+                <span className="w-3 h-3 rounded-full" style={{backgroundColor:s.color}}/>
+                <span className="text-sm">{s.name}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
