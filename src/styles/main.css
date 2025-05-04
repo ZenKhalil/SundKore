@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+/* Force light mode styles */
+:root:not(.dark) {
+  --background-color: white;
+  --text-color: #1e293b;
+  background-color: var(--background-color);
+  color: var(--text-color);
+}
+
+/* Force dark mode styles */
+:root.dark {
+  --background-color: #0f172a;
+  --text-color: white;
+  background-color: var(--background-color);
+  color: var(--text-color);
+}
+
+/* Override chart backgrounds */
+:root:not(.dark) .bg-slate-50 {
+  background-color: #f8fafc !important;
+}
+
+:root.dark .dark\:bg-slate-900 {
+  background-color: #0f172a !important;
+}
+
+/* Important override for the main content area */
+:root:not(.dark) main {
+  background-color: white !important;
+}
+
+:root.dark main {
+  background-color: #0f172a !important;
+}
