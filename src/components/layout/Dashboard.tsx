@@ -8,13 +8,14 @@ import {
   FileText,
   Settings,
   HelpCircle,
-  Download,
   User,
 } from "lucide-react";
+import { TicketsViews } from "../../features/tickets/TicketsViews";
 
 export const Dashboard: React.FC = () => {
   const location = useLocation();
   const [darkMode, setDarkMode] = useState(false); // Default to light mode
+  const [activeView, setActiveView] = useState("Forskningsudtræk (Ny)");
 
   useEffect(() => {
     // Initialize light mode
@@ -34,9 +35,18 @@ export const Dashboard: React.FC = () => {
     },
   ];
 
+  // Check if we're on the tickets page
+  const isTicketsPage = location.pathname === "/tickets";
+
+  // Handle view change from the sidebar
+  const handleViewChange = (viewName: string) => {
+    setActiveView(viewName);
+    // You can pass this to the Tickets component if needed
+  };
+
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
+      {/* Main Sidebar */}
       <aside className="w-64 bg-white border-r border-gray-200">
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center">
@@ -114,9 +124,15 @@ export const Dashboard: React.FC = () => {
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-auto">
-        <Outlet />
+      {/* Main content with conditional Views sidebar for Tickets page */}
+      <main className="flex flex-1 overflow-hidden">
+        {/* Views sidebar - Only shown on the Tickets page */}
+        {isTicketsPage && <TicketsViews onViewChange={handleViewChange} />}
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-auto">
+          <Outlet />
+        </div>
       </main>
     </div>
   );
