@@ -112,6 +112,15 @@ export const TicketsViews: React.FC<TicketsViewsProps> = ({
     return acc;
   }, {} as Record<string, TicketView[]>);
 
+  // Helper function to format count values for display
+  const formatCount = (count: number | string): string => {
+    if (typeof count === "string") {
+      // Make sure string counts don't break onto multiple lines
+      return count.replace(" ", "\u00A0"); // Replace spaces with non-breaking spaces
+    }
+    return count.toString();
+  };
+
   // Render loading state
   if (isLoading) {
     return (
@@ -168,29 +177,35 @@ export const TicketsViews: React.FC<TicketsViewsProps> = ({
                 {typeViews.map((view) => (
                   <div
                     key={view.id}
-                    className={`flex justify-between items-center py-2 px-3 rounded-md text-sm mb-1 cursor-pointer transition-colors duration-150 ease-in-out ${
+                    className={`group flex items-center py-2 px-3 rounded-md text-sm mb-1 cursor-pointer transition-colors duration-150 ease-in-out ${
                       view.id === activeViewId
                         ? "bg-blue-50 text-blue-700 shadow-sm"
                         : "hover:bg-gray-50 text-gray-700"
                     }`}
                     onClick={() => handleViewClick(view.id)}
                     data-testid={`view-${view.id}`}
+                    title={`${view.name} (${view.count})`} // Add tooltip for long names
                   >
-                    <div className="flex items-center space-x-2 truncate">
+                    {/* Icon and name container with flex-grow to take available space */}
+                    <div className="flex-grow min-w-0 flex items-center space-x-2">
                       {view.icon && (
-                        <span className="text-lg">{view.icon}</span>
+                        <span className="flex-shrink-0 text-lg">
+                          {view.icon}
+                        </span>
                       )}
                       <span className="truncate">{view.name}</span>
                     </div>
-                    <span
-                      className={`ml-1 ${
+
+                    {/* Count badge with fixed width to prevent layout shifts */}
+                    <div
+                      className={`ml-2 flex-shrink-0 inline-flex items-center justify-center min-w-[40px] ${
                         view.id === activeViewId
                           ? "bg-blue-100 text-blue-800"
                           : "bg-gray-100 text-gray-600"
                       } px-2 py-0.5 rounded-full text-xs font-medium`}
                     >
-                      {view.count}
-                    </span>
+                      {formatCount(view.count)}
+                    </div>
                   </div>
                 ))}
               </div>
