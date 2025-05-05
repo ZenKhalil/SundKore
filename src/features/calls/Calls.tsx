@@ -126,7 +126,7 @@ const totalCalls = 497;
 // Calls component
 // ------------------------------------
 export const Calls: React.FC = () => {
-  const [timeFrame, setTimeFrame] = useState("Tidsramme: Sidste 30 dage");
+  const [timeFrame, setTimeFrame] = useState("Sidste 30 dage");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [activityTimeFrame, setActivityTimeFrame] = useState<
     "month" | "year" | "week"
@@ -232,7 +232,7 @@ export const Calls: React.FC = () => {
 
           {isDropdownOpen && (
             <div className="absolute mt-1 z-10 bg-white shadow-lg rounded-md w-full">
-              {["Tidsramme: Sidste 30 dage", "Sidste 7 dage", "Sidste år"].map(
+              {["Sidste 30 dage", "Sidste 7 dage", "Sidste år"].map(
                 (option) => (
                   <div
                     key={option}
@@ -252,23 +252,23 @@ export const Calls: React.FC = () => {
       </div>
 
       {/* 1st Row: Stats Cards & Donut - Improved Responsive Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-y-5 gap-x-px mb-4">
         {/* Samlede Opkald Card */}
-        <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col items-center justify-between">
-          <h3 className="text-sm font-medium text-gray-500 text-center">
+        <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col items-center justify-between w-[80%] mx-auto max-h-[80%]">
+          <h3 className="text-lg font-medium text-gray-500 text-center">
             Samlede Opkald
           </h3>
           <p className="text-4xl md:text-5xl font-bold text-gray-900 my-2 truncate w-full text-center">
             {mockCallsData.total}
           </p>
-          <p className="text-lg md:text-xl font-medium text-red-500">
+          <p className="text-lg md:text-3xl font-medium text-red-500">
             ↑ {mockCallsData.percentageChange}%
           </p>
         </div>
 
         {/* Gn. opkaldsvarighed Card */}
-        <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col items-center justify-between">
-          <h3 className="text-sm font-medium text-gray-500 text-center">
+        <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col items-center justify-between w-[80%] mx-auto max-h-[80%]">
+          <h3 className="text-lg font-medium text-gray-500 text-center">
             Gn. opkaldsvarighed
           </h3>
           <p className="text-4xl md:text-5xl font-bold text-gray-900 my-2 truncate w-full text-center">
@@ -279,14 +279,14 @@ export const Calls: React.FC = () => {
         </div>
 
         {/* Besvarelsesrate */}
-        <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col items-center justify-between">
-          <h3 className="text-sm font-medium text-gray-500 text-center">
+        <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col items-center justify-between w-[80%] mx-auto max-h-[80%]">
+          <h3 className="text-lg font-medium text-gray-500 text-center">
             Besvarelsesrate
           </h3>
           <p className="text-4xl md:text-5xl font-bold text-gray-900 my-2 truncate w-full text-center">
             {mockCallsData.responseRate}%
           </p>
-          <p className="text-lg md:text-xl font-medium text-green-500">
+          <p className="text-lg md:text-3xl font-medium text-green-500">
             ↑ {mockCallsData.responseRateChange}%
           </p>
         </div>
