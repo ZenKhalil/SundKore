@@ -157,8 +157,8 @@ export const Reports: React.FC = () => {
       <div className="flex flex-wrap gap-4 mb-3">
         {[
           {
-            defaultValue: "Tidsramme: Sidste 30 dage",
-            options: ["Tidsramme: Sidste 30 dage", "Sidste 7 dage", "Sidste år"],
+            defaultValue: "Sidste 30 dage",
+            options: ["Sidste 30 dage", "Sidste 7 dage", "Sidste år"],
           },
           {
             defaultValue: "Personer: Alle",
