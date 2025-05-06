@@ -4,7 +4,6 @@ import {
   ChevronDown,
   Check,
   UserPlus,
-  Clock,
   Tag,
   Trash2,
   Archive,
@@ -12,56 +11,184 @@ import {
   Bell,
 } from "lucide-react";
 
-// Define the ticket type to match your data structure
-export interface Ticket {
+// Define types with type modifier to comply with verbatimModuleSyntax
+type Ticket = {
   id: string;
   subject: string;
   status: string;
   priority: string;
   updated: string;
   anmoder: string;
+  anmoderName: string;
   database: string;
   response: string;
-}
+  group: string;
+  assignee: string;
+};
 
-interface TicketsTableProps {
-  tickets: Ticket[]; // Array of tickets to display
-}
+type SLAStats = {
+  averageResponseTime: string;
+  responseTimeChange: number;
+  slaCompliance: number;
+  slaComplianceChange: number;
+  nearSLALimit: number;
+  overSLA: number;
+};
 
-const TicketsTable: React.FC<TicketsTableProps> = ({ tickets }) => {
-  // State for pagination
+type TicketsTableProps = {
+  initialTickets?: Ticket[];
+};
+
+// Mock SLA stats
+const mockSLAStats: SLAStats = {
+  averageResponseTime: "34 min",
+  responseTimeChange: -12,
+  slaCompliance: 91,
+  slaComplianceChange: 3,
+  nearSLALimit: 7,
+  overSLA: 3,
+};
+
+// Mock tickets data - will be used if no initialTickets are provided
+const defaultMockTickets: Ticket[] = [
+  {
+    id: "#15483",
+    subject: "Glemt adgangskode/spærret bruger",
+    status: "Ny",
+    priority: "Normal",
+    updated: "I dag 15:18",
+    anmoder: "johanne.nielsen@company.dk",
+    anmoderName: "Johanne Nielsen",
+    database: "Dansk Anæstesidatabase (DAD)",
+    response: "18t",
+    group: "Support",
+    assignee: "",
+  },
+  {
+    id: "#15471",
+    subject: "Opret ny bruger",
+    status: "Ny",
+    priority: "Normal",
+    updated: "I dag 13:39",
+    anmoder: "kasper.moller@healthorg.dk",
+    anmoderName: "Kasper Møller",
+    database: "Dansk Hoftealloplastik Register",
+    response: "2d",
+    group: "IT Support",
+    assignee: "",
+  },
+  {
+    id: "#15477",
+    subject: "Opret ny bruger",
+    status: "Ny",
+    priority: "Normal",
+    updated: "I dag 14:43",
+    anmoder: "marie.andersen@research.org",
+    anmoderName: "Marie Andersen",
+    database: "Dansk Kolorektal Cancer Database",
+    response: "2d",
+    group: "Support",
+    assignee: "",
+  },
+  {
+    id: "#15478",
+    subject: "Opret ny bruger",
+    status: "Ny",
+    priority: "Normal",
+    updated: "I dag 14:46",
+    anmoder: "mikkel.poulsen@hospital.dk",
+    anmoderName: "Mikkel Poulsen",
+    database: "Dansk Herniedatabase (DHD)",
+    response: "2d",
+    group: "IT Support",
+    assignee: "",
+  },
+  {
+    id: "#15489",
+    subject: "Anden henvendelse",
+    status: "Ny",
+    priority: "Normal",
+    updated: "I dag 18:32",
+    anmoder: "louise.madsen@clinic.dk",
+    anmoderName: "Louise Madsen",
+    database: "Support",
+    response: "1d",
+    group: "Support",
+    assignee: "",
+  },
+  {
+    id: "#15490",
+    subject: "Anden henvendelse",
+    status: "Ny",
+    priority: "Normal",
+    updated: "For 44 minutter siden",
+    anmoder: "simon.berg@medcenter.dk",
+    anmoderName: "Simon Berg",
+    database: "Support",
+    response: "2d",
+    group: "Support",
+    assignee: "",
+  },
+  {
+    id: "#14931",
+    subject: "Anden henvendelse",
+    status: "Åben",
+    priority: "Normal",
+    updated: "22. apr",
+    anmoder: "eva.thygesen@research.dk",
+    anmoderName: "Eva Thygesen",
+    database: "Den Nationale Skizofreni database",
+    response: "2d",
+    group: "Support",
+    assignee: "Anders Johansen",
+  },
+];
+
+// Main component with internal types
+const TicketsTable: React.FC<TicketsTableProps> = ({ initialTickets }) => {
+  // Use provided tickets or default to mock data
+  const allTickets = initialTickets || defaultMockTickets;
+
+  // State for tickets data
   const [displayedTickets, setDisplayedTickets] = useState<Ticket[]>([]);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [totalTickets, setTotalTickets] = useState(allTickets.length);
+
+  // Pagination state
   const [page, setPage] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
-  const ticketsPerPage = 5; // Initial number of tickets to show
-  const maxTickets = tickets.length;
+  const ticketsPerPage = 5;
+
+  // SLA stats state
+  const [slaStats, setSlaStats] = useState<SLAStats>(mockSLAStats);
 
   // State for bulk actions
   const [selectedTickets, setSelectedTickets] = useState<string[]>([]);
   const [bulkActionMenuOpen, setBulkActionMenuOpen] = useState(false);
   const [allSelected, setAllSelected] = useState(false);
 
-  // Initialize displayed tickets
+  // Initial data loading
   useEffect(() => {
-    setDisplayedTickets(tickets.slice(0, ticketsPerPage));
-  }, [tickets]);
+    // Display initial tickets
+    setDisplayedTickets(allTickets.slice(0, ticketsPerPage));
+    setTotalTickets(allTickets.length);
+  }, [initialTickets]);
 
   // Load more tickets when the button is clicked
   const loadMoreTickets = () => {
-    setIsLoading(true);
+    setIsLoadingMore(true);
 
-    // Simulate API call delay
+    // Simulate loading delay
     setTimeout(() => {
       const nextPage = page + 1;
-      const endIndex = Math.min(nextPage * ticketsPerPage, maxTickets);
-      setDisplayedTickets(tickets.slice(0, endIndex));
+      const endIndex = Math.min(nextPage * ticketsPerPage, allTickets.length);
+      setDisplayedTickets(allTickets.slice(0, endIndex));
       setPage(nextPage);
-      setIsLoading(false);
+      setIsLoadingMore(false);
     }, 500);
   };
 
   // Check if we've loaded all tickets
-  const hasMoreTickets = displayedTickets.length < maxTickets;
+  const hasMoreTickets = displayedTickets.length < totalTickets;
 
   // Handle select all tickets
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,13 +221,10 @@ const TicketsTable: React.FC<TicketsTableProps> = ({ tickets }) => {
 
   // Handle bulk action selection
   const handleBulkAction = (action: string) => {
-    // Here you would implement the actual bulk action functionality
-    console.log(`Performing ${action} on tickets:`, selectedTickets);
-
-    // Close the menu after action is selected
+    // Close the menu
     setBulkActionMenuOpen(false);
 
-    // Show success message or perform additional UI updates if needed
+    // In mock data mode, just show an alert
     alert(`${action} udført på ${selectedTickets.length} valgte tickets`);
 
     // Clear selection after action
@@ -118,30 +242,52 @@ const TicketsTable: React.FC<TicketsTableProps> = ({ tickets }) => {
             <div className="text-xs text-gray-500 mb-1">
               Gennemsnitlig svartid
             </div>
-            <div className="text-xl font-semibold">34 min</div>
-            <div className="text-xs text-green-500 mt-1">
-              ↓ 12% fra sidste uge
+            <div className="text-xl font-semibold">
+              {slaStats.averageResponseTime}
+            </div>
+            <div
+              className={`text-xs ${
+                slaStats.responseTimeChange < 0
+                  ? "text-green-500"
+                  : "text-red-500"
+              } mt-1`}
+            >
+              {slaStats.responseTimeChange < 0 ? "↓" : "↑"}{" "}
+              {Math.abs(slaStats.responseTimeChange)}% fra sidste uge
             </div>
           </div>
           <div className="bg-gray-50 rounded-lg p-4 text-center">
             <div className="text-xs text-gray-500 mb-1">SLA overholdelse</div>
-            <div className="text-xl font-semibold">91%</div>
-            <div className="text-xs text-green-500 mt-1">
-              ↑ 3% fra sidste uge
+            <div className="text-xl font-semibold">
+              {slaStats.slaCompliance}%
+            </div>
+            <div
+              className={`text-xs ${
+                slaStats.slaComplianceChange > 0
+                  ? "text-green-500"
+                  : "text-red-500"
+              } mt-1`}
+            >
+              {slaStats.slaComplianceChange > 0 ? "↑" : "↓"}{" "}
+              {Math.abs(slaStats.slaComplianceChange)}% fra sidste uge
             </div>
           </div>
           <div className="bg-gray-50 rounded-lg p-4 text-center">
             <div className="text-xs text-gray-500 mb-1">
               Tickets nær SLA grænse
             </div>
-            <div className="text-xl font-semibold text-orange-500">7</div>
+            <div className="text-xl font-semibold text-orange-500">
+              {slaStats.nearSLALimit}
+            </div>
             <div className="text-xs text-gray-500 mt-1">
               &lt; 2 timer tilbage
             </div>
           </div>
           <div className="bg-gray-50 rounded-lg p-4 text-center">
             <div className="text-xs text-gray-500 mb-1">Tickets over SLA</div>
-            <div className="text-xl font-semibold text-red-500">3</div>
+            <div className="text-xl font-semibold text-red-500">
+              {slaStats.overSLA}
+            </div>
             <div className="text-xs text-red-500 mt-1">
               Kræver omgående handling
             </div>
@@ -153,14 +299,14 @@ const TicketsTable: React.FC<TicketsTableProps> = ({ tickets }) => {
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center">
           <h3 className="text-sm font-medium text-gray-700">
-            Tickets, der kræver din opmærksomhed ({maxTickets})
+            Tickets, der kræver din opmærksomhed ({totalTickets})
           </h3>
           <div className="ml-3 flex space-x-2">
             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-              3 over SLA
+              {slaStats.overSLA} over SLA
             </span>
             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-              7 nær grænsen
+              {slaStats.nearSLALimit} nær grænsen
             </span>
           </div>
         </div>
@@ -202,28 +348,28 @@ const TicketsTable: React.FC<TicketsTableProps> = ({ tickets }) => {
             <div className="absolute right-0 mt-1 w-56 bg-white rounded-md shadow-lg z-10 border border-gray-200">
               <div className="py-1">
                 <button
-                  onClick={() => handleBulkAction("Tildel til agent")}
+                  onClick={() => handleBulkAction("assign")}
                   className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                 >
                   <UserPlus size={14} className="mr-2" />
                   Tildel til agent
                 </button>
                 <button
-                  onClick={() => handleBulkAction("Opdater status")}
+                  onClick={() => handleBulkAction("update-status")}
                   className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                 >
                   <Check size={14} className="mr-2" />
                   Opdater status
                 </button>
                 <button
-                  onClick={() => handleBulkAction("Flyt til gruppe")}
+                  onClick={() => handleBulkAction("move-group")}
                   className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                 >
                   <Tag size={14} className="mr-2" />
                   Flyt til gruppe
                 </button>
                 <button
-                  onClick={() => handleBulkAction("Sæt prioritet")}
+                  onClick={() => handleBulkAction("set-priority")}
                   className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                 >
                   <Bell size={14} className="mr-2" />
@@ -231,21 +377,21 @@ const TicketsTable: React.FC<TicketsTableProps> = ({ tickets }) => {
                 </button>
                 <div className="border-t border-gray-100 my-1"></div>
                 <button
-                  onClick={() => handleBulkAction("Eksportér valgte")}
+                  onClick={() => handleBulkAction("export")}
                   className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                 >
                   <Clipboard size={14} className="mr-2" />
                   Eksportér valgte
                 </button>
                 <button
-                  onClick={() => handleBulkAction("Arkivér valgte")}
+                  onClick={() => handleBulkAction("archive")}
                   className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                 >
                   <Archive size={14} className="mr-2" />
                   Arkivér valgte
                 </button>
                 <button
-                  onClick={() => handleBulkAction("Slet valgte")}
+                  onClick={() => handleBulkAction("delete")}
                   className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
                 >
                   <Trash2 size={14} className="mr-2" />
@@ -261,14 +407,7 @@ const TicketsTable: React.FC<TicketsTableProps> = ({ tickets }) => {
         <table className="min-w-full divide-y divide-gray-200">
           <thead>
             <tr className="bg-gray-50">
-              <th className="w-10 px-3 py-3 text-left">
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={handleSelectAll}
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-              </th>
+              <th className="w-10 px-3 py-3 text-left"></th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Ticket-status
               </th>
@@ -298,7 +437,7 @@ const TicketsTable: React.FC<TicketsTableProps> = ({ tickets }) => {
           <tbody className="divide-y divide-gray-200 bg-white">
             {displayedTickets.map((ticket, index) => (
               <tr
-                key={index}
+                key={ticket.id}
                 className={`hover:bg-gray-50 ${
                   selectedTickets.includes(ticket.id) ? "bg-blue-50" : ""
                 }`}
@@ -331,16 +470,16 @@ const TicketsTable: React.FC<TicketsTableProps> = ({ tickets }) => {
                   {ticket.subject}
                 </td>
                 <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
-                  {ticket.anmoder}
+                  {ticket.anmoderName} ({ticket.anmoder})
                 </td>
                 <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
                   {ticket.updated}
                 </td>
                 <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
-                  Support
+                  {ticket.group}
                 </td>
                 <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
-                  {ticket.anmoder === "tdp@dadlnet.dk" ? "Tina Vammen" : "-"}
+                  {ticket.assignee || "-"}
                 </td>
                 <td className="px-3 py-3 whitespace-nowrap">
                   {/* SLA status with colored indicators */}
@@ -399,10 +538,10 @@ const TicketsTable: React.FC<TicketsTableProps> = ({ tickets }) => {
         {hasMoreTickets ? (
           <button
             onClick={loadMoreTickets}
-            disabled={isLoading}
+            disabled={isLoadingMore}
             className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
           >
-            {isLoading ? (
+            {isLoadingMore ? (
               <>
                 <svg
                   className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-700"
@@ -430,7 +569,7 @@ const TicketsTable: React.FC<TicketsTableProps> = ({ tickets }) => {
               <>
                 Vis flere tickets
                 <span className="ml-1 text-gray-400">
-                  ({displayedTickets.length} af {maxTickets})
+                  ({displayedTickets.length} af {totalTickets})
                 </span>
                 <ArrowRight size={16} className="ml-2" />
               </>
@@ -438,7 +577,7 @@ const TicketsTable: React.FC<TicketsTableProps> = ({ tickets }) => {
           </button>
         ) : (
           <div className="text-sm text-gray-500">
-            Alle tickets vises ({maxTickets})
+            Alle tickets vises ({totalTickets})
           </div>
         )}
       </div>
