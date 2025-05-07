@@ -7,7 +7,7 @@ import { Home } from "./features/home/home";
 import { Reports } from "./features/reports/Reports";
 import { Calls } from "./features/calls/Calls";
 import { Tickets } from "./features/tickets/Tickets";
-import { Triggers } from "./features/triggers/Triggers";
+import  Triggers  from "./features/triggers/Triggers";
 import { MorningRoutine } from "./features/morning/MorningRoutine";
 
 export const router = createBrowserRouter([
