@@ -235,7 +235,7 @@ export default function Triggers() {
   return (
     <div className="max-w-7xl mx-auto p-5 bg-gray-50">
       {/* Header */}
-      <div className="flex justify-between items-center mb-5 pb-3 border-b">
+      <div className="border-b border-gray-300 border-opacity-50 pb-3 mb-5 flex justify-between items-center">
         <h1 className="text-2xl font-bold">Triggers</h1>
         <div className="flex space-x-2">
           <button className="flex items-center px-4 py-2 bg-white border rounded">
