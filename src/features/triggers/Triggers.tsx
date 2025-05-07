@@ -1194,7 +1194,7 @@ export default function Triggers() {
               dataKey="success"
               name="Vellykkede"
               fill="#10B981"
-              barSize={20}
+              barSize={35}
               stackId="a"
               radius={[4, 4, 0, 0]}
             />
