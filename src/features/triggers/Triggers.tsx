@@ -544,7 +544,7 @@ export default function Triggers() {
       {/* 3rd Row: Filter/Search Panel */}
       <div className="bg-white p-4 rounded-xl shadow-sm mb-6">
         <div className="flex flex-col md:flex-row justify-between gap-4">
-          <div className="relative w-full md:w-1/3">
+          <div className="relative w-60">
             <input
               type="text"
               placeholder="Søg efter triggers..."
@@ -1194,7 +1194,7 @@ export default function Triggers() {
               dataKey="success"
               name="Vellykkede"
               fill="#10B981"
-              barSize={35}
+              barSize={45}
               stackId="a"
               radius={[4, 4, 0, 0]}
             />
