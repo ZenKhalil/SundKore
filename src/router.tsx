@@ -8,7 +8,7 @@ import { Reports } from "./features/reports/Reports";
 import { Calls } from "./features/calls/Calls";
 import { Tickets } from "./features/tickets/Tickets";
 import  Triggers  from "./features/triggers/Triggers";
-import { MorningRoutine } from "./features/morning/MorningRoutine";
+import  Morgenrutine  from "./features/morgenrutine/Morgenrutine";
 
 export const router = createBrowserRouter([
   {
@@ -41,8 +41,8 @@ export const router = createBrowserRouter([
         element: <Triggers />,
       },
       {
-        path: "morning",
-        element: <MorningRoutine />,
+        path: "morgenrutine",
+        element: <Morgenrutine />,
       },
     ],
   },
