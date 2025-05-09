@@ -1,6 +1,6 @@
 // src/features/calls/Calls.tsx
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -9,170 +9,95 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   PieChart,
   Pie,
   Cell,
-  Legend,
   LineChart,
   Line,
+  ScatterChart,
+  Scatter,
+  ZAxis,
+  ReferenceLine,
 } from "recharts";
-import { Download, ChevronDown } from "lucide-react";
+import {
+  Download,
+  ChevronDown,
+  FileText,
+  Clock,
+  Phone,
+  PhoneOff,
+  BarChart as BarChartIcon,
+  AlertCircle,
+  Calendar,
+  Users,
+  RefreshCw,
+  ArrowRight,
+  ArrowDown,
+  Timer,
+  Filter,
+  AlertTriangle,
+  CheckCircle,
+  Info,
+} from "lucide-react";
 
-// ------------------------------------
-// Mock data
-// ------------------------------------
-const mockCallsData = {
-  total: 38,
-  percentageChange: 2,
-  avgCallDuration: 334, // seconds
-  responseRate: 78, // percentage
-  responseRateChange: 5 // percentage change
-};
+// Import mock data from separate file
+import {
+  mockDataByTimeRange,
+  availableTimeRanges,
+  reportGenerated,
+} from "./callsMockData";
 
-// Monthly activity with multiple data series for the bar chart
-const mockMonthlyActivity = [
-  { name: "JAN", besvaret: 250, ubesvaret: 150, afbrudt: 100 },
-  { name: "FEB", besvaret: 180, ubesvaret: 190, afbrudt: 40 },
-  { name: "MAR", besvaret: 130, ubesvaret: 140, afbrudt: 60 },
-  { name: "APR", besvaret: 210, ubesvaret: 360, afbrudt: 280 },
-  { name: "MAJ", besvaret: 260, ubesvaret: 210, afbrudt: 230 },
-  { name: "JUN", besvaret: 150, ubesvaret: 270, afbrudt: 130 },
-  { name: "JUL", besvaret: 300, ubesvaret: 240, afbrudt: 120 },
-  { name: "AUG", besvaret: 120, ubesvaret: 240, afbrudt: 50 },
-  { name: "SEP", besvaret: 380, ubesvaret: 220, afbrudt: 150 },
-  { name: "OKT", besvaret: 250, ubesvaret: 190, afbrudt: 200 },
-  { name: "NOV", besvaret: 320, ubesvaret: 180, afbrudt: 50 },
-  { name: "DEC", besvaret: 140, ubesvaret: 150, afbrudt: 40 },
-];
+import type { DonutItem } from "./callsMockData";
 
-const mockWeeklyActivity = [
-  { name: "Man", besvaret: 40, ubesvaret: 30, afbrudt: 20 },
-  { name: "Tir", besvaret: 55, ubesvaret: 35, afbrudt: 25 },
-  { name: "Ons", besvaret: 60, ubesvaret: 45, afbrudt: 30 },
-  { name: "Tor", besvaret: 80, ubesvaret: 50, afbrudt: 40 },
-  { name: "Fre", besvaret: 70, ubesvaret: 40, afbrudt: 30 },
-  { name: "Lør", besvaret: 50, ubesvaret: 30, afbrudt: 20 },
-  { name: "Søn", besvaret: 30, ubesvaret: 20, afbrudt: 10 },
-];
-
-const mockYearlyActivity = [
-  { name: "2022", besvaret: 1200, ubesvaret: 900, afbrudt: 700 },
-  { name: "2023", besvaret: 1350, ubesvaret: 1050, afbrudt: 800 },
-  { name: "2024", besvaret: 1500, ubesvaret: 1200, afbrudt: 900 },
-];
-
-// Response rate trend data for the line chart
-const responseRateTrend = Array.from({ length: 31 }, (_, i) => ({
-  day: i + 1,
-  besvaret: 60 + Math.sin(i / 2) * 20 + Math.random() * 5,
-  ubesvaret: 50 + Math.cos(i / 3) * 15 + Math.random() * 5,
-  mål: 80,
-}));
-
-// Staff performance data
-const staffPerformance = [
-  { name: "Steen Andersen", resolved: 15, initial: "S" },
-  { name: "Eva Hansen", resolved: 9, initial: "E" },
-  { name: "Peter Mortensen", resolved: 11, initial: "P" },
-];
-
-// Call statistics for the table
-const callStats = [
-  {
-    id: 1,
-    label: "Total Opkald i kø",
-    count: 276,
-    change: 51,
-    increasing: true,
-  },
-  {
-    id: 2,
-    label: "Total Opkald besvaret",
-    count: 149,
-    change: 12,
-    increasing: false,
-  },
-  {
-    id: 3,
-    label: "Total Opkald ubesvaret",
-    count: 189,
-    change: 19,
-    increasing: true,
-  },
-  {
-    id: 4,
-    label: "Total Opkald Afbrudt",
-    count: 159,
-    change: 33,
-    increasing: false,
-  },
-];
-
-// Donut chart data
-interface DonutItem {
-  name: string;
+// Interface for label props for the donut chart
+interface RenderLabelProps {
+  cx: number;
+  cy: number;
+  midAngle: number;
+  outerRadius: number;
   value: number;
-  color: string;
+  name: string;
+  index: number;
 }
 
-const donutData: DonutItem[] = [
-  { name: "Afbrudt", value: 0.32, color: "#F97066" },
-  { name: "Ubesvaret", value: 0.38, color: "#6366F1" },
-  { name: "Besvaret", value: 0.3, color: "#2DD4BF" },
-];
-const totalCalls = 497;
+// Custom tooltip interface
+interface HeatmapTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    payload: [number, number, number, string, number]; // hour, day, queued, date, answered
+  }>;
+}
 
 // ------------------------------------
 // Calls component
 // ------------------------------------
 export const Calls: React.FC = () => {
-  const [timeFrame, setTimeFrame] = useState("Sidste 30 dage");
+  const [timeFrame, setTimeFrame] = useState(availableTimeRanges[0]); // Default to last 7 days
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [activityTimeFrame, setActivityTimeFrame] = useState<
-    "month" | "year" | "week"
-  >("month");
+  const [currentData, setCurrentData] = useState(
+    mockDataByTimeRange[timeFrame]
+  );
+  const [heatmapView, setHeatmapView] = useState<"queued" | "answered">(
+    "queued"
+  );
+  const [expandedTables, setExpandedTables] = useState({
+    waitTimes: false,
+    dailyActivity: false,
+  });
 
-  // Define fixed heatmap data with type safety
-  const heatmap = [
-    { month: "JAN", "9": 2, "10": 3, "11": 1, "12": 4, "13": 2, "14": 3 },
-    { month: "MAR", "9": 3, "10": 1, "11": 4, "12": 2, "13": 3, "14": 1 },
-    { month: "FEB", "9": 1, "10": 4, "11": 3, "12": 2, "13": 1, "14": 3 },
-    { month: "APR", "9": 4, "10": 2, "11": 1, "12": 3, "13": 4, "14": 2 },
-    { month: "JUN", "9": 3, "10": 4, "11": 2, "12": 1, "13": 3, "14": 4 },
-    { month: "MAJ", "9": 2, "10": 1, "11": 3, "12": 4, "13": 2, "14": 1 },
-    { month: "JUL", "9": 1, "10": 3, "11": 4, "12": 2, "13": 1, "14": 3 },
-    { month: "AUG", "9": 4, "10": 2, "11": 1, "12": 3, "13": 4, "14": 2 },
-    { month: "SEP", "9": 3, "10": 1, "11": 2, "12": 4, "13": 3, "14": 1 },
-    { month: "OKT", "9": 2, "10": 4, "11": 3, "12": 1, "13": 2, "14": 4 },
-    { month: "NOV", "9": 4, "10": 2, "11": 1, "12": 3, "13": 4, "14": 2 },
-    { month: "DEC", "9": 1, "10": 3, "11": 4, "12": 2, "13": 1, "14": 3 },
-  ];
+  // Update data when time frame changes
+  useEffect(() => {
+    setCurrentData(mockDataByTimeRange[timeFrame]);
+  }, [timeFrame]);
 
-  // Pick data based on timeFrame for Activity chart
-  const activityData =
-    activityTimeFrame === "month"
-      ? mockMonthlyActivity
-      : activityTimeFrame === "week"
-      ? mockWeeklyActivity
-      : mockYearlyActivity;
-
-  // Activity time frame options
-  const frameOptions = [
-    { label: "Måned", value: "month" },
-    { label: "År", value: "year" },
-    { label: "Uge", value: "week" },
-  ];
-
-  // Interface for label props
-  interface RenderLabelProps {
-    cx: number;
-    cy: number;
-    midAngle: number;
-    outerRadius: number;
-    value: number;
-    name: string;
-    index: number;
-  }
+  // Toggle expanded tables
+  const toggleTable = (table: "waitTimes" | "dailyActivity") => {
+    setExpandedTables({
+      ...expandedTables,
+      [table]: !expandedTables[table],
+    });
+  };
 
   // Label rendering function for donut chart
   const renderCustomizedLabel = (props: RenderLabelProps) => {
@@ -208,19 +133,49 @@ export const Calls: React.FC = () => {
     );
   };
 
+  // Format time string to human readable
+  const formatTime = (timeString: string) => {
+    if (!timeString || timeString === "00:00:00") return "-";
+    const parts = timeString.split(":");
+    const minutes = parseInt(parts[1]);
+    const seconds = parseInt(parts[2]);
+
+    if (minutes === 0) {
+      return `${seconds} sek`;
+    } else {
+      return `${minutes} min ${seconds} sek`;
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-5 bg-gray-50">
       {/* Header */}
       <div className="flex justify-between items-center mb-5 pb-3 border-b border-gray-200">
-        <h1 className="text-2xl font-bold text-gray-900">Calls</h1>
-        <button className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-          <Download size={18} className="mr-2" />
-          Download
-        </button>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Call Center Rapport
+          </h1>
+          <p className="text-gray-500">
+            Sundk callcenter - {currentData.reportDateRange}
+          </p>
+        </div>
+        <div className="flex space-x-3">
+          <button className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+            <RefreshCw size={16} className="mr-2" />
+            Opdater
+          </button>
+          <button className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+            <Download size={16} className="mr-2" />
+            Download Rapport
+          </button>
+        </div>
       </div>
-
       {/* Time filter dropdown */}
-      <div className="mb-6">
+      <div className="mb-6 flex items-center">
+        <div className="mr-2">
+          <Calendar size={18} className="text-gray-500" />
+        </div>
+        <span className="mr-2 text-sm text-gray-600">Periode:</span>
         <div className="relative inline-block">
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -232,402 +187,978 @@ export const Calls: React.FC = () => {
 
           {isDropdownOpen && (
             <div className="absolute mt-1 z-10 bg-white shadow-lg rounded-md w-full">
-              {["Sidste 30 dage", "Sidste 7 dage", "Sidste år"].map(
-                (option) => (
-                  <div
-                    key={option}
-                    className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
-                    onClick={() => {
-                      setTimeFrame(option);
-                      setIsDropdownOpen(false);
-                    }}
-                  >
-                    {option}
-                  </div>
-                )
-              )}
+              {availableTimeRanges.map((option) => (
+                <div
+                  key={option}
+                  className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+                  onClick={() => {
+                    setTimeFrame(option);
+                    setIsDropdownOpen(false);
+                  }}
+                >
+                  {option}
+                </div>
+              ))}
             </div>
           )}
         </div>
       </div>
-
-      {/* 1st Row: Stats Cards & Donut - Improved Responsive Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-y-5 gap-x-px mb-4">
-        {/* Samlede Opkald Card */}
-        <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col items-center justify-between w-[80%] mx-auto max-h-[80%]">
-          <h3 className="text-lg font-medium text-gray-500 text-center">
-            Samlede Opkald
-          </h3>
-          <p className="text-4xl md:text-5xl font-bold text-gray-900 my-2 truncate w-full text-center">
-            {mockCallsData.total}
-          </p>
-          <p className="text-lg md:text-3xl font-medium text-red-500">
-            ↑ {mockCallsData.percentageChange}%
-          </p>
-        </div>
-
-        {/* Gn. opkaldsvarighed Card */}
-        <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col items-center justify-between w-[80%] mx-auto max-h-[80%]">
-          <h3 className="text-lg font-medium text-gray-500 text-center">
-            Gn. opkaldsvarighed
-          </h3>
-          <p className="text-4xl md:text-5xl font-bold text-gray-900 my-2 truncate w-full text-center">
-            {Math.floor(mockCallsData.avgCallDuration / 60)}m{" "}
-            {(mockCallsData.avgCallDuration % 60).toString().padStart(2, "0")}s
-          </p>
-          <div className="invisible text-sm h-6">&nbsp;</div>
-        </div>
-
-        {/* Besvarelsesrate */}
-        <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col items-center justify-between w-[80%] mx-auto max-h-[80%]">
-          <h3 className="text-lg font-medium text-gray-500 text-center">
-            Besvarelsesrate
-          </h3>
-          <p className="text-4xl md:text-5xl font-bold text-gray-900 my-2 truncate w-full text-center">
-            {mockCallsData.responseRate}%
-          </p>
-          <p className="text-lg md:text-3xl font-medium text-green-500">
-            ↑ {mockCallsData.responseRateChange}%
-          </p>
-        </div>
-        {/* Donut Chart - More responsive */}
-        <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col">
-          <h3 className="text-sm font-medium text-gray-500 mb-2">
-            Alle opkald
-          </h3>
-
-          <div className="relative flex-1 flex justify-center items-center min-h-[160px] md:min-h-[180px]">
-            {/* Donut Chart Implementation */}
-            <ResponsiveContainer width="100%" height="100%" minHeight={160}>
-              <PieChart>
-                <Pie
-                  data={donutData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="42%"
-                  startAngle={90}
-                  endAngle={-270}
-                  innerRadius="55%"
-                  outerRadius="87%"
-                  paddingAngle={2}
-                  label={renderCustomizedLabel}
-                  labelLine={false}
-                >
-                  {donutData.map((entry, index) => (
-                    <Cell key={index} fill={entry.color} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-
-            {/* Center text */}
-            <div
-              className="absolute inset-0 flex flex-col items-center justify-center"
-              style={{ pointerEvents: "none", marginTop: "-20px" }}
-            >
-              <span className="text-xl md:text-2xl font-bold text-gray-900">
-                {totalCalls}
-              </span>
-              <span className="text-xs text-gray-500">OPKALD</span>
+      {/* Summary banner */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="flex items-center justify-center md:justify-start">
+            <div className="bg-blue-100 p-3 rounded-full">
+              <Phone className="h-6 w-6 text-blue-700" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-blue-900">Total opkald</p>
+              <p className="text-xl font-semibold text-blue-900">
+                {currentData.callCenterStats.total}
+              </p>
             </div>
           </div>
 
-          {/* Legend with colored boxes */}
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
-            {donutData.map((entry) => (
-              <div
-                key={entry.name}
-                className="px-2 py-1 rounded-md text-white text-xs font-medium"
-                style={{ backgroundColor: entry.color }}
+          <div className="flex items-center justify-center md:justify-start">
+            <div className="bg-green-100 p-3 rounded-full">
+              <CheckCircle className="h-6 w-6 text-green-700" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-blue-900">Besvaret</p>
+              <p className="text-xl font-semibold text-blue-900">
+                {currentData.callCenterStats.answered}
+                <span className="text-sm ml-1 font-normal">
+                  ({currentData.callCenterStats.percentAnswered}%)
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center md:justify-start">
+            <div className="bg-red-100 p-3 rounded-full">
+              <AlertTriangle className="h-6 w-6 text-red-700" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-blue-900">Ubesvaret</p>
+              <p className="text-xl font-semibold text-blue-900">
+                {currentData.callCenterStats.abandoned}
+                <span className="text-sm ml-1 font-normal">
+                  ({100 - currentData.callCenterStats.percentAnswered}%)
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center md:justify-start">
+            <div className="bg-indigo-100 p-3 rounded-full">
+              <Timer className="h-6 w-6 text-indigo-700" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-blue-900">
+                Svartid &lt;60s
+              </p>
+              <p className="text-xl font-semibold text-blue-900">
+                {currentData.callCenterStats.percentAnsweredIn60Secs}%
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+      {/* 1st Row: KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {/* KPI Card 1 - Service Level */}
+        <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col">
+          <div className="flex items-center mb-1">
+            <div className="p-2 rounded-md bg-indigo-50 text-indigo-600 mr-2">
+              <Clock size={16} />
+            </div>
+            <h3 className="text-sm font-medium text-gray-500">
+              Service Niveau
+            </h3>
+          </div>
+          <div className="mt-1">
+            <p className="text-2xl font-bold text-gray-900">
+              {currentData.callCenterStats.percentAnsweredIn60SecsOfAnswered}%
+            </p>
+            <div className="text-xs text-gray-500 mt-1">
+              <span
+                className={
+                  currentData.callStats[3].increasing
+                    ? "text-green-600"
+                    : "text-red-600"
+                }
               >
-                {entry.name.toUpperCase()}
+                {currentData.callStats[3].increasing ? "↑" : "↓"}{" "}
+                {currentData.callStats[3].change}
+              </span>{" "}
+              fra forrige periode
+            </div>
+          </div>
+          <div className="mt-auto pt-2">
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-indigo-600 h-2 rounded-full"
+                style={{
+                  width: `${currentData.callCenterStats.percentAnsweredIn60SecsOfAnswered}%`,
+                }}
+              ></div>
+            </div>
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>0%</span>
+              <span>Mål: 80%</span>
+              <span>100%</span>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI Card 2 - Response Rate */}
+        <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col">
+          <div className="flex items-center mb-1">
+            <div className="p-2 rounded-md bg-green-50 text-green-600 mr-2">
+              <Phone size={16} />
+            </div>
+            <h3 className="text-sm font-medium text-gray-500">Svarprocent</h3>
+          </div>
+          <div className="mt-1">
+            <p className="text-2xl font-bold text-gray-900">
+              {currentData.callCenterStats.percentAnswered}%
+            </p>
+            <div className="text-xs text-gray-500 mt-1">
+              <span
+                className={
+                  currentData.callStats[1].increasing
+                    ? "text-green-600"
+                    : "text-red-600"
+                }
+              >
+                {currentData.callStats[1].increasing ? "↑" : "↓"}{" "}
+                {currentData.callStats[1].change}
+              </span>{" "}
+              fra forrige periode
+            </div>
+          </div>
+          <div className="mt-auto pt-2">
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-green-600 h-2 rounded-full"
+                style={{
+                  width: `${currentData.callCenterStats.percentAnswered}%`,
+                }}
+              ></div>
+            </div>
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>0%</span>
+              <span>Mål: 75%</span>
+              <span>100%</span>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI Card 3 - Longest Wait Time */}
+        <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col">
+          <div className="flex items-center mb-1">
+            <div className="p-2 rounded-md bg-yellow-50 text-yellow-600 mr-2">
+              <AlertCircle size={16} />
+            </div>
+            <h3 className="text-sm font-medium text-gray-500">
+              Længste Ventetid
+            </h3>
+          </div>
+          <div className="mt-1">
+            <p className="text-2xl font-bold text-gray-900">
+              {formatTime(currentData.callCenterStats.longestWaitTime)}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Maksimal acceptabel: 2:00 min
+            </p>
+          </div>
+          <div className="mt-auto pt-2">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="text-center">
+                <div className="text-xs font-medium text-gray-500">
+                  Gns. ventetid
+                </div>
+                <div className="text-sm font-semibold text-gray-700">
+                  0:30 min
+                </div>
               </div>
-            ))}
+              <div className="text-center">
+                <div className="text-xs font-medium text-gray-500">
+                  Gns. taletid
+                </div>
+                <div className="text-sm font-semibold text-gray-700">
+                  2:45 min
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-xs font-medium text-gray-500">
+                  Opkald/time
+                </div>
+                <div className="text-sm font-semibold text-gray-700">
+                  {Math.round(currentData.callCenterStats.total / (10 * 8))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI Card 4 - Abandonment Rate */}
+        <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col">
+          <div className="flex items-center mb-1">
+            <div className="p-2 rounded-md bg-red-50 text-red-600 mr-2">
+              <PhoneOff size={16} />
+            </div>
+            <h3 className="text-sm font-medium text-gray-500">
+              Frafaldsprocent
+            </h3>
+          </div>
+          <div className="mt-1">
+            <p className="text-2xl font-bold text-gray-900">
+              {100 - currentData.callCenterStats.percentAnswered}%
+            </p>
+            <div className="text-xs text-gray-500 mt-1">
+              <span
+                className={
+                  !currentData.callStats[2].increasing
+                    ? "text-green-600"
+                    : "text-red-600"
+                }
+              >
+                {!currentData.callStats[2].increasing ? "↓" : "↑"}{" "}
+                {currentData.callStats[2].change}
+              </span>{" "}
+              fra forrige periode
+            </div>
+          </div>
+          <div className="mt-auto pt-2">
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-red-600 h-2 rounded-full"
+                style={{
+                  width: `${
+                    100 - currentData.callCenterStats.percentAnswered
+                  }%`,
+                }}
+              ></div>
+            </div>
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>0%</span>
+              <span>Max: 25%</span>
+              <span>50%</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 2nd Row: Response Rate Chart - With Legend Positioned Lower */}
-      <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="text-sm font-medium text-gray-500">
-            Besvarelsesrate & «60s trend (7-dages gns.)
-          </h3>
-        </div>
+      {/* ── Combined Section: Donut Chart + Målinger + Ugentlig aktivitet  &  Heatmap ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* LEFT STACK: Donut → Målinger → Ugentlig aktivitet */}
+        <div className="flex flex-col space-y-6">
+          {/* Donut Chart */}
+          <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-sm font-medium text-gray-500">
+                Fordeling af opkald
+              </h3>
+            </div>
 
-        {/* Original height container */}
-        <div className="h-[250px] flex flex-col">
-          {/* Chart area - slightly taller to push legend down */}
-          <div className="h-[85%]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={responseRateTrend}
-                margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
+            <div className="relative flex-1 flex justify-center items-center min-h-[250px]">
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={currentData.donutData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    startAngle={90}
+                    endAngle={-270}
+                    innerRadius="55%"
+                    outerRadius="80%"
+                    paddingAngle={2}
+                    label={renderCustomizedLabel}
+                    labelLine={false}
+                  >
+                    {currentData.donutData.map((entry, i) => (
+                      <Cell key={i} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(v, name) => [
+                      `${Math.round(Number(v) * 100)}%`,
+                      name,
+                    ]}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+
+              <div
+                className="absolute inset-0 flex flex-col items-center justify-center"
+                style={{ pointerEvents: "none" }}
+              >
+                <span className="text-3xl font-bold text-gray-900">
+                  {currentData.callCenterStats.total}
+                </span>
+                <span className="text-sm text-gray-500">TOTAL OPKALD</span>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap justify-center gap-3">
+              {currentData.donutData.map((entry) => (
+                <div
+                  key={entry.name}
+                  className="px-3 py-1 rounded-full text-white text-xs font-medium"
+                  style={{ backgroundColor: entry.color }}
+                >
+                  {entry.name.toUpperCase()} ({Math.round(entry.value * 100)}%)
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              <div className="bg-gray-50 p-2 rounded border border-gray-200">
+                <div className="text-xs text-gray-500">Gns. tid på opgave</div>
+                <div className="text-sm font-semibold">3:15 min</div>
+              </div>
+              <div className="bg-gray-50 p-2 rounded border border-gray-200">
+                <div className="text-xs text-gray-500">Gns. tid i kø</div>
+                <div className="text-sm font-semibold">0:45 min</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Målinger */}
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <h3 className="text-sm font-medium text-gray-500 mb-3">Målinger</h3>
+            <div className="divide-y divide-gray-100">
+              {currentData.callStats.map((stat) => (
+                <div key={stat.id} className="flex justify-between py-2">
+                  <span className="text-sm font-medium text-gray-900">
+                    {stat.label}
+                  </span>
+                  <div className="flex items-center">
+                    <span className="text-sm font-medium text-gray-900 mr-3">
+                      {stat.count}
+                    </span>
+                    <span
+                      className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
+                        stat.increasing
+                          ? "text-green-800 bg-green-100"
+                          : "text-red-800 bg-red-100"
+                      }`}
+                    >
+                      <span>{stat.change}</span>
+                      <span className="ml-1">
+                        {stat.increasing ? "▲" : "▼"}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Ugentlig aktivitet */}
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <h3 className="text-sm font-medium text-gray-500 mb-3">
+              Ugentlig aktivitet
+            </h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart
+                data={currentData.weeklyCallActivity}
+                margin={{ top: 10, right: 0, left: 0, bottom: 5 }}
+                barSize={25}
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis
-                  dataKey="day"
-                  axisLine={false}
-                  tickLine={false}
-                  padding={{ left: 10, right: 10 }}
-                  tick={{ fontSize: "0.85rem" }}
-                />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  domain={[0, 100]}
-                  ticks={[0, 20, 40, 60, 80, 100]}
-                  tickFormatter={(value) => `${value}%`}
-                  tick={{ fontSize: "0.85rem" }}
+                  width={25}
+                  domain={[0, "auto"]}
+                  allowDecimals={false}
                 />
-                <Tooltip
-                  formatter={(value: number) => {
-                    return [`${Math.round(value)}%`, ""];
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="mål"
-                  stroke="#6B7280"
-                  strokeWidth={1}
-                  strokeDasharray="5 5"
-                  dot={false}
-                  name="mål"
-                />
-                <Line
-                  type="monotone"
+                <Tooltip />
+                <Legend />
+                <Bar
                   dataKey="besvaret"
-                  stroke="#2DD4BF"
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 6 }}
-                  name="besvaret"
+                  fill="#2DD4BF"
+                  radius={[4, 4, 0, 0]}
+                  stackId="a"
+                  name="Besvaret"
                 />
-                <Line
-                  type="monotone"
+                <Bar
                   dataKey="ubesvaret"
-                  stroke="#F59E0B"
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 6 }}
-                  name="ubesvaret"
+                  fill="#F97066"
+                  radius={[4, 4, 0, 0]}
+                  stackId="a"
+                  name="Ubesvaret"
                 />
-              </LineChart>
+              </BarChart>
             </ResponsiveContainer>
           </div>
+        </div>
 
-          {/* Legend with larger text - positioned at the bottom */}
-          <div className="h-[15%] flex items-end justify-center pb-1">
-            <div className="flex flex-wrap justify-center gap-x-5 gap-y-1">
-              <div className="flex items-center">
-                <div className="h-2 w-2 rounded-full bg-gray-500 mr-1"></div>
-                <span className="text-[clamp(11px,0.8vw,14px)]">Mål: 80%</span>
+        {/* RIGHT COLUMN: Call Volume Heatmap */}
+        <div className="bg-white rounded-xl shadow-sm p-5">
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center">
+              <div className="p-2 rounded-md bg-blue-50 text-blue-600 mr-2">
+                <Clock size={18} />
               </div>
-              <div className="flex items-center">
-                <div className="h-2 w-2 rounded-full bg-teal-400 mr-1"></div>
-                <span className="text-[clamp(11px,0.8vw,14px)]">
-                  Besvaret (7-dages gns.)
-                </span>
-              </div>
-              <div className="flex items-center">
-                <div className="h-2 w-2 rounded-full bg-amber-500 mr-1"></div>
-                <span className="text-[clamp(11px,0.8vw,14px)]">
-                  Ubesvaret (7-dages gns.)
-                </span>
-              </div>
+              <h3 className="text-base font-medium text-gray-700">
+                Opkald fordelt på ugedag og time
+              </h3>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setHeatmapView("queued")}
+                className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
+                  heatmapView === "queued"
+                    ? "bg-blue-100 text-blue-700 font-medium"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                Alle opkald
+              </button>
+              <button
+                onClick={() => setHeatmapView("answered")}
+                className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
+                  heatmapView === "answered"
+                    ? "bg-blue-100 text-blue-700 font-medium"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                Besvarede
+              </button>
+            </div>
+          </div>
+
+          <div className="mb-4 flex items-center">
+            <div className="text-xs text-gray-500 flex items-center">
+              <Info size={14} className="mr-1" />
+              Grafikken viser {heatmapView === "queued"
+                ? "alle"
+                : "besvarede"}{" "}
+              opkald fordelt på ugedag og tid.
+            </div>
+          </div>
+
+          <div className="relative">
+            {/* Day headers */}
+            <div className="grid grid-cols-7 mb-2">
+              {["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"].map(
+                (day, idx) => (
+                  <div
+                    key={day}
+                    className={`text-xs font-medium text-center py-1 ${
+                      idx >= 5 ? "text-blue-400" : "text-gray-700"
+                    }`}
+                  >
+                    {day}
+                  </div>
+                )
+              )}
+            </div>
+
+            {/* Heatmap grid */}
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: 70 }, (_, i) => {
+                const hour = 8 + Math.floor(i / 7);
+                const day = i % 7;
+                const dataPoint = currentData.callHeatmapData.find(
+                  (d) => d[0] === hour && d[1] === day
+                );
+                if (!dataPoint) {
+                  return (
+                    <div
+                      key={i}
+                      className="aspect-square rounded-md bg-gray-50"
+                    />
+                  );
+                }
+                const value =
+                  heatmapView === "queued" ? dataPoint[2] : dataPoint[4];
+                const date = dataPoint[3];
+                const viewMax = Math.max(
+                  ...currentData.callHeatmapData.map((d) =>
+                    heatmapView === "queued" ? d[2] : d[4]
+                  )
+                );
+                const isHigh = value > viewMax * 0.7;
+
+                const getImprovedHeatmapColor = (
+                  val: number,
+                  maxVal: number
+                ): string => {
+                  const intensity = Math.min(0.95, val / maxVal);
+                  if (intensity < 0.2) return "rgba(237, 246, 255, 0.95)";
+                  else if (intensity < 0.4) return "rgba(191, 219, 254, 0.95)";
+                  else if (intensity < 0.6) return "rgba(96, 165, 250, 0.95)";
+                  else if (intensity < 0.8) return "rgba(59, 130, 246, 0.95)";
+                  else return "rgba(30, 64, 175, 0.95)";
+                };
+
+                return (
+                  <div
+                    key={i}
+                    className="group relative aspect-square rounded-md flex items-center justify-center transition-all duration-150 hover:scale-105 cursor-pointer overflow-visible"
+                    style={{
+                      backgroundColor: getImprovedHeatmapColor(value, viewMax),
+                    }}
+                  >
+                    <span
+                      className={`text-xs font-medium ${
+                        isHigh ? "text-white" : "text-gray-700"
+                      }`}
+                    >
+                      {value > 0 ? value : ""}
+                    </span>
+
+                    {value > 0 && (
+                      <div className="absolute opacity-0 group-hover:opacity-100 bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-10 transition-opacity duration-150 pointer-events-none">
+                        <div className="bg-gray-800 text-white text-xs rounded py-1.5 px-2 min-w-max shadow-lg">
+                          <p className="font-medium">
+                            {
+                              [
+                                "Mandag",
+                                "Tirsdag",
+                                "Onsdag",
+                                "Torsdag",
+                                "Fredag",
+                                "Lørdag",
+                                "Søndag",
+                              ][day]
+                            }
+                            , {date}
+                          </p>
+                          <p>Kl. {hour}:00</p>
+                          <p className="font-medium mt-1">
+                            {heatmapView === "queued"
+                              ? `${value} opkald i kø`
+                              : `${value} besvarede opkald`}
+                          </p>
+                          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Hour markers */}
+            <div className="flex justify-between mt-2 px-2">
+              <span className="text-xs text-gray-500">8:00</span>
+              <span className="text-xs text-gray-500">10:00</span>
+              <span className="text-xs text-gray-500">12:00</span>
+              <span className="text-xs text-gray-500">14:00</span>
+              <span className="text-xs text-gray-500">16:00</span>
+            </div>
+          </div>
+
+          {/* Heatmap Legend */}
+          <div className="mt-6 pt-4 border-t border-gray-100">
+            <p className="text-xs text-gray-500 mb-2">Intensitet:</p>
+            <div className="flex items-center">
+              <div
+                className="h-2 flex-grow rounded-l-full"
+                style={{ background: "rgba(237, 246, 255, 0.95)" }}
+              />
+              <div
+                className="h-2 flex-grow"
+                style={{ background: "rgba(191, 219, 254, 0.95)" }}
+              />
+              <div
+                className="h-2 flex-grow"
+                style={{ background: "rgba(96, 165, 250, 0.95)" }}
+              />
+              <div
+                className="h-2 flex-grow"
+                style={{ background: "rgba(59, 130, 246, 0.95)" }}
+              />
+              <div
+                className="h-2 flex-grow rounded-r-full"
+                style={{ background: "rgba(30, 64, 175, 0.95)" }}
+              />
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-xs text-gray-500">Få opkald</span>
+              <span className="text-xs text-gray-500">Mange opkald</span>
             </div>
           </div>
         </div>
       </div>
-      {/* 3rd Row: Staff Performance & Call Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Staff Performance */}
+      {/* ── Besvarelsesrate og service niveau trend ── */}
+      <div className="grid grid-cols-1 gap-6 mb-6">
         <div className="bg-white rounded-xl shadow-sm p-4">
-          <h3 className="text-sm font-medium text-gray-500 mb-3">
-            Opkald besvaret
-          </h3>
-
-          <div className="space-y-3">
-            {staffPerformance.map((agent) => {
-              // Get initials from the name
-              const nameParts = agent.name.split(" ");
-              const initials =
-                nameParts.length > 1
-                  ? `${nameParts[0][0]}${nameParts[1][0]}`
-                  : nameParts[0][0];
-
-              return (
-                <div key={agent.name} className="flex items-center">
-                  {/* Initials Circle */}
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-medium text-sm">
-                      {initials}
-                    </div>
-                  </div>
-
-                  <div className="ml-3 flex-grow">
-                    <p className="font-medium text-gray-900 text-sm">
-                      {agent.name}
-                    </p>
-                    <div className="flex items-center mt-1">
-                      <div className="flex-grow bg-gray-100 rounded-full h-2">
-                        <div
-                          className="h-2 rounded-full"
-                          style={{
-                            width: `${(agent.resolved / 15) * 75}%`,
-                            backgroundColor: "#10B981",
-                            backgroundImage:
-                              "linear-gradient(to right, #10B981, #34d399)",
-                          }}
-                        />
-                      </div>
-                      <span className="ml-3 font-medium text-gray-900">
-                        {agent.resolved}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-sm font-medium text-gray-500">
+              Besvarelsesrate og service niveau trend
+            </h3>
           </div>
-        </div>
-        {/* Call Statistics with reduced height */}
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <h3 className="text-sm font-medium text-gray-500 mb-3">Målinger</h3>
 
-          <div className="divide-y divide-gray-100">
-            {callStats.map((stat) => (
-              <div key={stat.id} className="flex justify-between py-2">
-                <span className="text-sm font-medium text-gray-900">
-                  {stat.label}
-                </span>
-                <div className="flex items-center">
-                  <span className="text-sm font-medium text-gray-900 mr-3">
-                    {stat.count}
-                  </span>
-                  <span
-                    className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
-                      stat.increasing
-                        ? "text-green-800 bg-green-100"
-                        : "text-red-800 bg-red-100"
-                    }`}
-                  >
-                    <span>{stat.change}</span>
-                    <span className="ml-1">{stat.increasing ? "▲" : "▼"}</span>
-                  </span>
-                </div>
-              </div>
-            ))}
+          <div className="h-[300px] flex flex-col">
+            <div className="h-[85%]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={currentData.responseRateTrend}
+                  margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="day"
+                    axisLine={false}
+                    tickLine={false}
+                    padding={{ left: 10, right: 10 }}
+                    tick={{ fontSize: "0.85rem" }}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    domain={[0, 100]}
+                    ticks={[0, 20, 40, 60, 80, 100]}
+                    tickFormatter={(v) => `${v}%`}
+                    tick={{ fontSize: "0.85rem" }}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => [`${Math.round(value)}%`, ""]}
+                    labelFormatter={(label) => `Dato: ${label}`}
+                  />
+                  <Legend />
+                  <ReferenceLine
+                    y={75}
+                    stroke="#6B7280"
+                    strokeDasharray="3 3"
+                    strokeWidth={1}
+                    label={{
+                      value: "Mål: 75%",
+                      position: "right",
+                      fill: "#6B7280",
+                      fontSize: 12,
+                    }}
+                  />
+                  <ReferenceLine
+                    y={80}
+                    stroke="#818CF8"
+                    strokeDasharray="3 3"
+                    strokeWidth={1}
+                    label={{
+                      value: "SLA: 80%",
+                      position: "right",
+                      fill: "#818CF8",
+                      fontSize: 12,
+                    }}
+                  />
+
+                  <Line
+                    type="monotone"
+                    dataKey="besvaret"
+                    stroke="#2DD4BF"
+                    strokeWidth={2}
+                    dot={{ fill: "#2DD4BF", r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Besvaret (%)"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="ubesvaret"
+                    stroke="#F97066"
+                    strokeWidth={2}
+                    dot={{ fill: "#F97066", r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Ubesvaret (%)"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="besvaret60"
+                    stroke="#818CF8"
+                    strokeWidth={2}
+                    dot={{ fill: "#818CF8", r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Besvaret <60s (%)"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
       </div>
-
-      {/* 4th Row (Last): Monthly Activity Chart & Heatmap */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Monthly Activity Chart - Takes more space (3/5) */}
-        <div className="lg:col-span-3 bg-white rounded-xl shadow-sm p-4">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Aktivitet</h3>
-            <select
-              value={activityTimeFrame}
-              onChange={(e) =>
-                setActivityTimeFrame(
-                  e.target.value as "month" | "week" | "year"
-                )
-              }
-              className="text-indigo-600 font-medium text-sm focus:outline-none"
-            >
-              {frameOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart
-              data={activityData}
-              margin={{ top: 10, right: 0, left: 0, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="name" axisLine={false} tickLine={false} />
-              <YAxis
-                axisLine={false}
-                tickLine={false}
-                width={40}
-                domain={[0, "auto"]}
-                tickCount={5}
-                allowDecimals={false}
-              />
-              <Tooltip />
-              <Bar
-                dataKey="besvaret"
-                fill="#2DD4BF"
-                radius={[4, 4, 0, 0]}
-                barSize={12}
-              />
-              <Bar
-                dataKey="ubesvaret"
-                fill="#6366F1"
-                radius={[4, 4, 0, 0]}
-                barSize={12}
-              />
-              <Bar
-                dataKey="afbrudt"
-                fill="#F97066"
-                radius={[4, 4, 0, 0]}
-                barSize={12}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Heatmap - Takes less space (2/5) */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-4">
-          <h3 className="text-sm font-medium text-gray-500 mb-4">
-            Opkald Volume (Heatmap)
+      {/* 5th Row: Wait Times Table */}
+      <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-sm font-medium text-gray-500">
+            Ventetider (High Water Marks)
           </h3>
+          <button
+            onClick={() => toggleTable("waitTimes")}
+            className="text-xs text-blue-600 flex items-center"
+          >
+            {expandedTables.waitTimes ? "Vis mindre" : "Vis alle"}
+            {expandedTables.waitTimes ? (
+              <ArrowDown size={14} className="ml-1" />
+            ) : (
+              <ArrowRight size={14} className="ml-1" />
+            )}
+          </button>
+        </div>
 
-          <div className="grid grid-cols-7 gap-1">
-            {/* Time labels */}
-            <div className="col-span-1"></div>
-            {["9", "10", "11", "12", "13", "14"].map((hour) => (
-              <div
-                key={hour}
-                className="text-center text-xs font-medium text-gray-500"
-              >
-                {hour}
-              </div>
-            ))}
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead>
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Dato & tid
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Længste ventetid
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Længste svartid
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Længste ventetid (afbrudt)
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {(expandedTables.waitTimes
+                ? currentData.waitTimeData
+                : currentData.waitTimeData.slice(0, 5)
+              ).map((item, index) => (
+                <tr key={index} className={index % 2 === 0 ? "bg-gray-50" : ""}>
+                  <td className="px-4 py-2 text-sm text-gray-900">
+                    {item.date}, {item.time}
+                  </td>
+                  <td className="px-4 py-2 text-sm text-gray-900">
+                    {item.longestWait}
+                  </td>
+                  <td className="px-4 py-2 text-sm text-gray-900">
+                    {item.longestAnswer}
+                  </td>
+                  <td className="px-4 py-2 text-sm text-gray-900">
+                    {item.longestAbandoned}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-            {/* Month rows */}
-            {heatmap.map((monthData, idx) => (
-              <React.Fragment key={idx}>
-                <div className="text-xs font-medium text-gray-500 flex items-center">
-                  {monthData.month}
-                </div>
-                {["9", "10", "11", "12", "13", "14"].map((hour) => {
-                  // Type casting to handle TypeScript index signature
-                  const hourKey = hour as keyof typeof monthData;
-                  const intensity = monthData[hourKey] as number;
-                  let bgColor = "bg-indigo-100";
-                  if (intensity === 2) bgColor = "bg-indigo-300";
-                  if (intensity === 3) bgColor = "bg-indigo-400";
-                  if (intensity === 4) bgColor = "bg-indigo-500";
+        {!expandedTables.waitTimes && currentData.waitTimeData.length > 5 && (
+          <div className="text-center mt-2 text-sm text-gray-500">
+            Viser 5 af {currentData.waitTimeData.length} rækker
+          </div>
+        )}
+      </div>
+      {/* 6th Row: Daily Call Activity Table */}
+      <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-sm font-medium text-gray-500">
+            Daglig aktivitet
+          </h3>
+          <button
+            onClick={() => toggleTable("dailyActivity")}
+            className="text-xs text-blue-600 flex items-center"
+          >
+            {expandedTables.dailyActivity ? "Vis mindre" : "Vis alle"}
+            {expandedTables.dailyActivity ? (
+              <ArrowDown size={14} className="ml-1" />
+            ) : (
+              <ArrowRight size={14} className="ml-1" />
+            )}
+          </button>
+        </div>
 
-                  return (
-                    <div
-                      key={`${monthData.month}-${hour}`}
-                      className={`h-5 rounded-md ${bgColor}`}
-                    />
-                  );
-                })}
-              </React.Fragment>
-            ))}
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead>
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Dato & tid
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  I kø
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Præsenteret
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Besvaret
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Besvaret &lt;60s
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Ubesvaret
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  %
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {(expandedTables.dailyActivity
+                ? currentData.dailyCallActivity
+                : currentData.dailyCallActivity.slice(0, 7)
+              ).map((item, index) => (
+                <tr key={index} className={index % 2 === 0 ? "bg-gray-50" : ""}>
+                  <td className="px-4 py-2 text-sm text-gray-900">
+                    {item.date}, {item.time}
+                  </td>
+                  <td className="px-4 py-2 text-sm text-gray-900">
+                    {item.queued}
+                  </td>
+                  <td className="px-4 py-2 text-sm text-gray-900">
+                    {item.presented}
+                  </td>
+                  <td className="px-4 py-2 text-sm text-gray-900">
+                    {item.answered}
+                  </td>
+                  <td className="px-4 py-2 text-sm text-gray-900">
+                    {item.answeredIn60Secs}
+                  </td>
+                  <td className="px-4 py-2 text-sm text-gray-900">
+                    {item.abandoned}
+                  </td>
+                  <td className="px-4 py-2 text-sm font-medium">
+                    <span
+                      className={
+                        item.percentAnswered >= 75
+                          ? "text-green-600"
+                          : item.percentAnswered >= 50
+                          ? "text-yellow-600"
+                          : "text-red-600"
+                      }
+                    >
+                      {item.percentAnswered}%
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {!expandedTables.dailyActivity &&
+          currentData.dailyCallActivity.length > 7 && (
+            <div className="text-center mt-2 text-sm text-gray-500">
+              Viser 7 af {currentData.dailyCallActivity.length} rækker
+            </div>
+          )}
+      </div>
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="flex items-center mb-2">
+            <div className="p-2 rounded-full bg-blue-50 text-blue-600 mr-2">
+              <Users size={18} />
+            </div>
+            <h3 className="text-sm font-medium text-gray-700">
+              Agent statistikker
+            </h3>
+          </div>
+          <div className="space-y-2 mt-3">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Antal agenter:</span>
+              <span className="font-medium">12</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Gns. svartid pr. agent:</span>
+              <span className="font-medium">1:05 min</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Gns. opkald pr. agent:</span>
+              <span className="font-medium">
+                {Math.round(currentData.callCenterStats.total / 12)}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Agent tilgængelighed:</span>
+              <span className="font-medium text-green-600">94%</span>
+            </div>
           </div>
         </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="flex items-center mb-2">
+            <div className="p-2 rounded-full bg-indigo-50 text-indigo-600 mr-2">
+              <Clock size={18} />
+            </div>
+            <h3 className="text-sm font-medium text-gray-700">
+              Timing metrikker
+            </h3>
+          </div>
+          <div className="space-y-2 mt-3">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Gns. ventetid alle opkald:</span>
+              <span className="font-medium">0:45 min</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Gns. samtaletid:</span>
+              <span className="font-medium">3:15 min</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Besvarede indenfor 30s:</span>
+              <span className="font-medium text-green-600">68%</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Gns. efterbehandlingstid:</span>
+              <span className="font-medium">1:20 min</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="flex items-center mb-2">
+            <div className="p-2 rounded-full bg-green-50 text-green-600 mr-2">
+              <BarChartIcon size={18} />
+            </div>
+            <h3 className="text-sm font-medium text-gray-700">Performance</h3>
+          </div>
+          <div className="space-y-2 mt-3">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">SLA Performance:</span>
+              <span
+                className={
+                  currentData.callCenterStats.percentAnsweredIn60Secs >= 80
+                    ? "font-medium text-green-600"
+                    : "font-medium text-yellow-600"
+                }
+              >
+                {currentData.callCenterStats.percentAnsweredIn60Secs >= 80
+                  ? "✓"
+                  : "⚠"}{" "}
+                {currentData.callCenterStats.percentAnsweredIn60Secs}%
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Trendfaktor:</span>
+              <span
+                className={
+                  currentData.callStats[1].increasing
+                    ? "font-medium text-green-600"
+                    : "font-medium text-red-600"
+                }
+              >
+                {currentData.callStats[1].increasing ? "↑" : "↓"}{" "}
+                {currentData.callStats[1].change}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">CSAT score:</span>
+              <span className="font-medium">4.2/5.0</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">FCR rate:</span>
+              <span className="font-medium">78%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      {/* Footer */}
+      <div className="text-center text-xs text-gray-500 mt-10">
+        <p>Call center rapport - {currentData.reportDateRange}</p>
+        <p className="mt-1">Generet: {reportGenerated}</p>
       </div>
     </div>
   );
