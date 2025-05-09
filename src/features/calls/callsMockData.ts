@@ -9,7 +9,7 @@ import {
 } from "date-fns";
 
 // Define interfaces for all data structures
-interface CallCenterStats {
+export interface CallCenterStats {
   total: number;
   answered: number;
   abandoned: number;
@@ -17,11 +17,17 @@ interface CallCenterStats {
   bounced: number;
   answeredIn60Secs: number;
   percentAnswered: number;
+  percentAbandoned: number;
   percentAnsweredIn60Secs: number;
   percentAnsweredIn60SecsOfAnswered: number;
   longestWaitTime: string;
   longestAnswerTime: string;
   longestWaitAbandoned: string;
+  avgWaitTime: string;
+  avgTalkTime: string;
+  avgTaskTime: string;
+  avgQueueTime: string;
+  callsPerHour: number;
 }
 
 interface PeriodData {
@@ -29,7 +35,7 @@ interface PeriodData {
   dateRange: string;
 }
 
-interface CallStat {
+export interface CallStat {
   id: number;
   label: string;
   count: number;
@@ -43,24 +49,24 @@ export interface DonutItem {
   color: string;
 }
 
-interface WeeklySummaryItem {
+export interface WeeklyActivity {
   name: string;
   besvaret: number;
   ubesvaret: number;
 }
 
-interface TrendDataItem {
+export interface ResponseRateTrend {
   day: string;
   besvaret: number;
   ubesvaret: number;
-  mål: number;
   besvaret60: number;
+  mål: number;
   target: number;
   date: string;
   dayOfWeek: number;
 }
 
-interface DailyActivityItem {
+export interface DailyActivity {
   date: string;
   time: string;
   queued: number;
@@ -74,7 +80,7 @@ interface DailyActivityItem {
   dayOfWeek: number;
 }
 
-interface WaitTimeItem {
+export interface WaitTimeItem {
   date: string;
   time: string;
   longestWait: string;
@@ -85,6 +91,35 @@ interface WaitTimeItem {
   numericAbandoned: number;
 }
 
+export interface AgentStats {
+  totalAgents: number;
+  avgResponseTimePerAgent: string;
+  avgCallsPerAgent: number;
+  agentAvailability: number;
+}
+
+export interface TimingMetrics {
+  avgWaitTimeAllCalls: string;
+  avgTalkTime: string;
+  percentAnsweredIn30Secs: number;
+  avgAfterCallWork: string;
+}
+
+export interface PerformanceMetrics {
+  slaPerformance: number;
+  trendDirection: "up" | "down";
+  trendChange: string;
+  csatScore: number;
+  fcrRate: number;
+}
+
+export interface ServiceTargets {
+  serviceLevel: number;
+  responseRate: number;
+  maxWaitTime: string;
+  maxAbandonRate: number;
+}
+
 // Updated HeatmapDataItem to include both queued and answered calls
 type HeatmapDataItem = [number, number, number, string, number]; // [hour, dayOfWeek, queued, date, answered]
 
@@ -92,12 +127,17 @@ interface TimeRangeData {
   callCenterStats: CallCenterStats;
   callStats: CallStat[];
   donutData: DonutItem[];
-  weeklyCallActivity: WeeklySummaryItem[];
-  responseRateTrend: TrendDataItem[];
+  weeklyCallActivity: WeeklyActivity[];
+  responseRateTrend: ResponseRateTrend[];
   reportDateRange: string;
   waitTimeData: WaitTimeItem[];
-  dailyCallActivity: DailyActivityItem[];
+  dailyCallActivity: DailyActivity[];
   callHeatmapData: HeatmapDataItem[];
+  companyName: string;
+  serviceTargets: ServiceTargets;
+  agentStats: AgentStats;
+  timingMetrics: TimingMetrics;
+  performanceMetrics: PerformanceMetrics;
 }
 
 // Helper function to generate random call data
@@ -136,6 +176,16 @@ function generateDataForPeriod(days: number): PeriodData {
   const longestAnswerSeconds = generateRandomCalls(0, 59);
   const longestAbandonedSeconds = generateRandomCalls(10, 59);
 
+  // Average time values
+  const avgWaitMinutes = generateRandomCalls(0, 1);
+  const avgWaitSeconds = generateRandomCalls(10, 50);
+  const avgTalkMinutes = generateRandomCalls(2, 4);
+  const avgTalkSeconds = generateRandomCalls(0, 59);
+  const avgTaskMinutes = generateRandomCalls(2, 5);
+  const avgTaskSeconds = generateRandomCalls(0, 59);
+  const avgQueueMinutes = generateRandomCalls(0, 1);
+  const avgQueueSeconds = generateRandomCalls(20, 55);
+
   return {
     stats: {
       total,
@@ -145,6 +195,7 @@ function generateDataForPeriod(days: number): PeriodData {
       bounced,
       answeredIn60Secs,
       percentAnswered: Math.round((answered / total) * 100),
+      percentAbandoned: Math.round((abandoned / total) * 100),
       percentAnsweredIn60Secs: Math.round((answeredIn60Secs / total) * 100),
       percentAnsweredIn60SecsOfAnswered: Math.round(
         (answeredIn60Secs / answered) * 100
@@ -155,14 +206,19 @@ function generateDataForPeriod(days: number): PeriodData {
         longestAnswerSeconds
       ),
       longestWaitAbandoned: createTimeString(0, longestAbandonedSeconds),
+      avgWaitTime: createTimeString(avgWaitMinutes, avgWaitSeconds),
+      avgTalkTime: createTimeString(avgTalkMinutes, avgTalkSeconds),
+      avgTaskTime: createTimeString(avgTaskMinutes, avgTaskSeconds),
+      avgQueueTime: createTimeString(avgQueueMinutes, avgQueueSeconds),
+      callsPerHour: Math.round(total / (10 * 8)),
     },
     dateRange,
   };
 }
 
 // Generate daily activity data - more realistic with weekly patterns
-function generateDailyCallActivity(days: number): DailyActivityItem[] {
-  const result: DailyActivityItem[] = [];
+function generateDailyCallActivity(days: number): DailyActivity[] {
+  const result: DailyActivity[] = [];
   const today = new Date();
 
   for (let i = days; i >= 0; i--) {
@@ -306,8 +362,8 @@ function generateWaitTimeData(days: number): WaitTimeItem[] {
 }
 
 // Generate trend data
-function generateTrendData(days: number): TrendDataItem[] {
-  const result: TrendDataItem[] = [];
+function generateTrendData(days: number): ResponseRateTrend[] {
+  const result: ResponseRateTrend[] = [];
   const today = new Date();
 
   for (let i = days; i >= 0; i--) {
@@ -345,9 +401,9 @@ function generateTrendData(days: number): TrendDataItem[] {
   return result;
 }
 
-// Generate heatmap data - updated to include answered calls
+// Generate heatmap data
 function generateHeatmapData(
-  dailyCallActivity: DailyActivityItem[]
+  dailyCallActivity: DailyActivity[]
 ): HeatmapDataItem[] {
   const heatmapData: HeatmapDataItem[] = [];
 
@@ -367,9 +423,9 @@ function generateHeatmapData(
 
 // Generate weekly summary
 function generateWeeklySummary(
-  dailyCallActivity: DailyActivityItem[]
-): WeeklySummaryItem[] {
-  const weeklyData: WeeklySummaryItem[] = [
+  dailyCallActivity: DailyActivity[]
+): WeeklyActivity[] {
+  const weeklyData: WeeklyActivity[] = [
     { name: "Man", besvaret: 0, ubesvaret: 0 },
     { name: "Tir", besvaret: 0, ubesvaret: 0 },
     { name: "Ons", besvaret: 0, ubesvaret: 0 },
@@ -452,6 +508,53 @@ function generateDonutData(stats: CallCenterStats): DonutItem[] {
   ];
 }
 
+// Generate agent statistics
+function generateAgentStats(stats: CallCenterStats): AgentStats {
+  const totalAgents = generateRandomCalls(10, 15);
+
+  return {
+    totalAgents,
+    avgResponseTimePerAgent: createTimeString(1, generateRandomCalls(0, 30)),
+    avgCallsPerAgent: Math.round(stats.total / totalAgents),
+    agentAvailability: generateRandomCalls(85, 98),
+  };
+}
+
+// Generate timing metrics
+function generateTimingMetrics(): TimingMetrics {
+  return {
+    avgWaitTimeAllCalls: createTimeString(0, generateRandomCalls(30, 55)),
+    avgTalkTime: createTimeString(3, generateRandomCalls(0, 30)),
+    percentAnsweredIn30Secs: generateRandomCalls(55, 75),
+    avgAfterCallWork: createTimeString(1, generateRandomCalls(0, 45)),
+  };
+}
+
+// Generate performance metrics
+function generatePerformanceMetrics(
+  stats: CallCenterStats
+): PerformanceMetrics {
+  const trendDirection = Math.random() > 0.5 ? "up" : "down";
+
+  return {
+    slaPerformance: stats.percentAnsweredIn60SecsOfAnswered,
+    trendDirection,
+    trendChange: generateRandomCalls(1, 10).toString(),
+    csatScore: 3.5 + Math.random() * 1.5,
+    fcrRate: generateRandomCalls(70, 90),
+  };
+}
+
+// Generate service targets
+function generateServiceTargets(): ServiceTargets {
+  return {
+    serviceLevel: 80,
+    responseRate: 75,
+    maxWaitTime: "02:00",
+    maxAbandonRate: 25,
+  };
+}
+
 // Generate data for all time periods
 const LAST_7_DAYS = generateDataForPeriod(7);
 const LAST_14_DAYS = generateDataForPeriod(14);
@@ -515,9 +618,45 @@ const DONUT_DATA_30_DAYS = generateDonutData(LAST_30_DAYS.stats);
 const DONUT_DATA_90_DAYS = generateDonutData(LAST_90_DAYS.stats);
 const DONUT_DATA_YEAR = generateDonutData(LAST_YEAR.stats);
 
+// Generate service targets (same for all periods)
+const SERVICE_TARGETS = generateServiceTargets();
+
+// Generate additional metrics for time periods
+const AGENT_STATS_7_DAYS = generateAgentStats(LAST_7_DAYS.stats);
+const AGENT_STATS_14_DAYS = generateAgentStats(LAST_14_DAYS.stats);
+const AGENT_STATS_30_DAYS = generateAgentStats(LAST_30_DAYS.stats);
+const AGENT_STATS_90_DAYS = generateAgentStats(LAST_90_DAYS.stats);
+const AGENT_STATS_YEAR = generateAgentStats(LAST_YEAR.stats);
+
+const TIMING_METRICS_7_DAYS = generateTimingMetrics();
+const TIMING_METRICS_14_DAYS = generateTimingMetrics();
+const TIMING_METRICS_30_DAYS = generateTimingMetrics();
+const TIMING_METRICS_90_DAYS = generateTimingMetrics();
+const TIMING_METRICS_YEAR = generateTimingMetrics();
+
+const PERFORMANCE_METRICS_7_DAYS = generatePerformanceMetrics(
+  LAST_7_DAYS.stats
+);
+const PERFORMANCE_METRICS_14_DAYS = generatePerformanceMetrics(
+  LAST_14_DAYS.stats
+);
+const PERFORMANCE_METRICS_30_DAYS = generatePerformanceMetrics(
+  LAST_30_DAYS.stats
+);
+const PERFORMANCE_METRICS_90_DAYS = generatePerformanceMetrics(
+  LAST_90_DAYS.stats
+);
+const PERFORMANCE_METRICS_YEAR = generatePerformanceMetrics(LAST_YEAR.stats);
+
+// Create a function to get current timestamp for the report generation
+export const getReportGeneratedTime = (): string => {
+  return format(new Date(), "dd-MM-yyyy, HH:mm");
+};
+
 // Export data with time ranges
 export const mockDataByTimeRange: Record<string, TimeRangeData> = {
   "Sidste 7 dage": {
+    companyName: "Sundk callcenter",
     callCenterStats: LAST_7_DAYS.stats,
     callStats: CALL_STATS_7_DAYS,
     donutData: DONUT_DATA_7_DAYS,
@@ -527,8 +666,13 @@ export const mockDataByTimeRange: Record<string, TimeRangeData> = {
     waitTimeData: WAIT_TIME_DATA_7_DAYS,
     dailyCallActivity: DAILY_ACTIVITY_7_DAYS,
     callHeatmapData: HEATMAP_DATA_7_DAYS,
+    serviceTargets: SERVICE_TARGETS,
+    agentStats: AGENT_STATS_7_DAYS,
+    timingMetrics: TIMING_METRICS_7_DAYS,
+    performanceMetrics: PERFORMANCE_METRICS_7_DAYS,
   },
   "Sidste 14 dage": {
+    companyName: "Sundk callcenter",
     callCenterStats: LAST_14_DAYS.stats,
     callStats: CALL_STATS_14_DAYS,
     donutData: DONUT_DATA_14_DAYS,
@@ -538,8 +682,13 @@ export const mockDataByTimeRange: Record<string, TimeRangeData> = {
     waitTimeData: WAIT_TIME_DATA_14_DAYS,
     dailyCallActivity: DAILY_ACTIVITY_14_DAYS,
     callHeatmapData: HEATMAP_DATA_14_DAYS,
+    serviceTargets: SERVICE_TARGETS,
+    agentStats: AGENT_STATS_14_DAYS,
+    timingMetrics: TIMING_METRICS_14_DAYS,
+    performanceMetrics: PERFORMANCE_METRICS_14_DAYS,
   },
   "Sidste 30 dage": {
+    companyName: "Sundk callcenter",
     callCenterStats: LAST_30_DAYS.stats,
     callStats: CALL_STATS_30_DAYS,
     donutData: DONUT_DATA_30_DAYS,
@@ -549,8 +698,13 @@ export const mockDataByTimeRange: Record<string, TimeRangeData> = {
     waitTimeData: WAIT_TIME_DATA_30_DAYS,
     dailyCallActivity: DAILY_ACTIVITY_30_DAYS,
     callHeatmapData: HEATMAP_DATA_30_DAYS,
+    serviceTargets: SERVICE_TARGETS,
+    agentStats: AGENT_STATS_30_DAYS,
+    timingMetrics: TIMING_METRICS_30_DAYS,
+    performanceMetrics: PERFORMANCE_METRICS_30_DAYS,
   },
   "Sidste 90 dage": {
+    companyName: "Sundk callcenter",
     callCenterStats: LAST_90_DAYS.stats,
     callStats: CALL_STATS_90_DAYS,
     donutData: DONUT_DATA_90_DAYS,
@@ -560,8 +714,13 @@ export const mockDataByTimeRange: Record<string, TimeRangeData> = {
     waitTimeData: WAIT_TIME_DATA_90_DAYS,
     dailyCallActivity: DAILY_ACTIVITY_90_DAYS,
     callHeatmapData: HEATMAP_DATA_90_DAYS,
+    serviceTargets: SERVICE_TARGETS,
+    agentStats: AGENT_STATS_90_DAYS,
+    timingMetrics: TIMING_METRICS_90_DAYS,
+    performanceMetrics: PERFORMANCE_METRICS_90_DAYS,
   },
   "Sidste år": {
+    companyName: "Sundk callcenter",
     callCenterStats: LAST_YEAR.stats,
     callStats: CALL_STATS_YEAR,
     donutData: DONUT_DATA_YEAR,
@@ -571,6 +730,10 @@ export const mockDataByTimeRange: Record<string, TimeRangeData> = {
     waitTimeData: WAIT_TIME_DATA_YEAR,
     dailyCallActivity: DAILY_ACTIVITY_YEAR,
     callHeatmapData: HEATMAP_DATA_YEAR,
+    serviceTargets: SERVICE_TARGETS,
+    agentStats: AGENT_STATS_YEAR,
+    timingMetrics: TIMING_METRICS_YEAR,
+    performanceMetrics: PERFORMANCE_METRICS_YEAR,
   },
 };
 
@@ -584,7 +747,7 @@ export const reportDateRange = LAST_7_DAYS.dateRange;
 export const waitTimeData = WAIT_TIME_DATA_7_DAYS;
 export const dailyCallActivity = DAILY_ACTIVITY_7_DAYS;
 export const callHeatmapData = HEATMAP_DATA_7_DAYS;
-export const reportGenerated = format(new Date(), "dd-MM-yyyy, HH:mm");
+export const reportGenerated = getReportGeneratedTime();
 
 // Export available time ranges
 export const availableTimeRanges = [

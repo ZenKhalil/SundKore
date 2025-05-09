@@ -41,14 +41,18 @@ import {
   Info,
 } from "lucide-react";
 
-// Import mock data from separate file
+// Import mock data and types from separate file
 import {
   mockDataByTimeRange,
   availableTimeRanges,
-  reportGenerated,
+  getReportGeneratedTime,
 } from "./callsMockData";
 
-import type { DonutItem } from "./callsMockData";
+import type {
+  AgentStats,
+  TimingMetrics,
+  PerformanceMetrics,
+} from "./callsMockData";
 
 // Interface for label props for the donut chart
 interface RenderLabelProps {
@@ -69,11 +73,25 @@ interface HeatmapTooltipProps {
   }>;
 }
 
+// Utility function for formatting time
+const formatTime = (timeString: string): string => {
+  if (!timeString || timeString === "00:00:00") return "-";
+  const parts = timeString.split(":");
+  const minutes = parseInt(parts[1]);
+  const seconds = parseInt(parts[2]);
+
+  if (minutes === 0) {
+    return `${seconds} sek`;
+  } else {
+    return `${minutes} min ${seconds} sek`;
+  }
+};
+
 // ------------------------------------
 // Calls component
 // ------------------------------------
 export const Calls: React.FC = () => {
-  const [timeFrame, setTimeFrame] = useState(availableTimeRanges[0]); // Default to last 7 days
+  const [timeFrame, setTimeFrame] = useState(availableTimeRanges[0]); // Default to first time range
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [currentData, setCurrentData] = useState(
     mockDataByTimeRange[timeFrame]
@@ -133,19 +151,27 @@ export const Calls: React.FC = () => {
     );
   };
 
-  // Format time string to human readable
-  const formatTime = (timeString: string) => {
-    if (!timeString || timeString === "00:00:00") return "-";
-    const parts = timeString.split(":");
-    const minutes = parseInt(parts[1]);
-    const seconds = parseInt(parts[2]);
-
-    if (minutes === 0) {
-      return `${seconds} sek`;
-    } else {
-      return `${minutes} min ${seconds} sek`;
-    }
+  // Utility function to get heatmap color based on value
+  const getHeatmapColor = (val: number, maxVal: number): string => {
+    const intensity = Math.min(0.95, val / maxVal);
+    if (intensity < 0.2) return "rgba(237, 246, 255, 0.95)";
+    else if (intensity < 0.4) return "rgba(191, 219, 254, 0.95)";
+    else if (intensity < 0.6) return "rgba(96, 165, 250, 0.95)";
+    else if (intensity < 0.8) return "rgba(59, 130, 246, 0.95)";
+    else return "rgba(30, 64, 175, 0.95)";
   };
+
+  // Day names for heatmap
+  const dayNames = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
+  const fullDayNames = [
+    "Mandag",
+    "Tirsdag",
+    "Onsdag",
+    "Torsdag",
+    "Fredag",
+    "Lørdag",
+    "Søndag",
+  ];
 
   return (
     <div className="max-w-7xl mx-auto p-5 bg-gray-50">
@@ -156,7 +182,7 @@ export const Calls: React.FC = () => {
             Call Center Rapport
           </h1>
           <p className="text-gray-500">
-            Sundk callcenter - {currentData.reportDateRange}
+            {currentData.companyName} - {currentData.reportDateRange}
           </p>
         </div>
         <div className="flex space-x-3">
@@ -242,7 +268,7 @@ export const Calls: React.FC = () => {
               <p className="text-xl font-semibold text-blue-900">
                 {currentData.callCenterStats.abandoned}
                 <span className="text-sm ml-1 font-normal">
-                  ({100 - currentData.callCenterStats.percentAnswered}%)
+                  ({currentData.callCenterStats.percentAbandoned}%)
                 </span>
               </p>
             </div>
@@ -304,7 +330,7 @@ export const Calls: React.FC = () => {
             </div>
             <div className="flex justify-between text-xs text-gray-500 mt-1">
               <span>0%</span>
-              <span>Mål: 80%</span>
+              <span>Mål: {currentData.serviceTargets.serviceLevel}%</span>
               <span>100%</span>
             </div>
           </div>
@@ -347,7 +373,7 @@ export const Calls: React.FC = () => {
             </div>
             <div className="flex justify-between text-xs text-gray-500 mt-1">
               <span>0%</span>
-              <span>Mål: 75%</span>
+              <span>Mål: {currentData.serviceTargets.responseRate}%</span>
               <span>100%</span>
             </div>
           </div>
@@ -368,7 +394,8 @@ export const Calls: React.FC = () => {
               {formatTime(currentData.callCenterStats.longestWaitTime)}
             </p>
             <p className="text-xs text-gray-500 mt-1">
-              Maksimal acceptabel: 2:00 min
+              Maksimal acceptabel:{" "}
+              {formatTime(currentData.serviceTargets.maxWaitTime)}
             </p>
           </div>
           <div className="mt-auto pt-2">
@@ -378,7 +405,7 @@ export const Calls: React.FC = () => {
                   Gns. ventetid
                 </div>
                 <div className="text-sm font-semibold text-gray-700">
-                  0:30 min
+                  {formatTime(currentData.callCenterStats.avgWaitTime)}
                 </div>
               </div>
               <div className="text-center">
@@ -386,7 +413,7 @@ export const Calls: React.FC = () => {
                   Gns. taletid
                 </div>
                 <div className="text-sm font-semibold text-gray-700">
-                  2:45 min
+                  {formatTime(currentData.callCenterStats.avgTalkTime)}
                 </div>
               </div>
               <div className="text-center">
@@ -394,7 +421,7 @@ export const Calls: React.FC = () => {
                   Opkald/time
                 </div>
                 <div className="text-sm font-semibold text-gray-700">
-                  {Math.round(currentData.callCenterStats.total / (10 * 8))}
+                  {currentData.callCenterStats.callsPerHour}
                 </div>
               </div>
             </div>
@@ -413,7 +440,7 @@ export const Calls: React.FC = () => {
           </div>
           <div className="mt-1">
             <p className="text-2xl font-bold text-gray-900">
-              {100 - currentData.callCenterStats.percentAnswered}%
+              {currentData.callCenterStats.percentAbandoned}%
             </p>
             <div className="text-xs text-gray-500 mt-1">
               <span
@@ -434,15 +461,13 @@ export const Calls: React.FC = () => {
               <div
                 className="bg-red-600 h-2 rounded-full"
                 style={{
-                  width: `${
-                    100 - currentData.callCenterStats.percentAnswered
-                  }%`,
+                  width: `${currentData.callCenterStats.percentAbandoned}%`,
                 }}
               ></div>
             </div>
             <div className="flex justify-between text-xs text-gray-500 mt-1">
               <span>0%</span>
-              <span>Max: 25%</span>
+              <span>Max: {currentData.serviceTargets.maxAbandonRate}%</span>
               <span>50%</span>
             </div>
           </div>
@@ -452,7 +477,7 @@ export const Calls: React.FC = () => {
       {/* ── Combined Section: Donut Chart + Målinger + Ugentlig aktivitet  &  Heatmap ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* LEFT STACK: Donut → Målinger → Ugentlig aktivitet */}
-        <div className="flex flex-col space-y-6">
+        <div className="flex flex-col space-y-2">
           {/* Donut Chart */}
           <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col">
             <div className="flex justify-between items-center mb-2">
@@ -517,11 +542,15 @@ export const Calls: React.FC = () => {
             <div className="grid grid-cols-2 gap-3 mt-4">
               <div className="bg-gray-50 p-2 rounded border border-gray-200">
                 <div className="text-xs text-gray-500">Gns. tid på opgave</div>
-                <div className="text-sm font-semibold">3:15 min</div>
+                <div className="text-sm font-semibold">
+                  {formatTime(currentData.callCenterStats.avgTaskTime)}
+                </div>
               </div>
               <div className="bg-gray-50 p-2 rounded border border-gray-200">
                 <div className="text-xs text-gray-500">Gns. tid i kø</div>
-                <div className="text-sm font-semibold">0:45 min</div>
+                <div className="text-sm font-semibold">
+                  {formatTime(currentData.callCenterStats.avgQueueTime)}
+                </div>
               </div>
             </div>
           </div>
@@ -599,8 +628,8 @@ export const Calls: React.FC = () => {
         </div>
 
         {/* RIGHT COLUMN: Call Volume Heatmap */}
-        <div className="bg-white rounded-xl shadow-sm p-5">
-          <div className="flex justify-between items-center mb-4">
+        <div className="bg-white rounded-xl shadow-sm p-3">
+          <div className="flex justify-between items-center mb-3">
             <div className="flex items-center">
               <div className="p-2 rounded-md bg-blue-50 text-blue-600 mr-2">
                 <Clock size={18} />
@@ -643,121 +672,103 @@ export const Calls: React.FC = () => {
             </div>
           </div>
 
-          <div className="relative">
+          <div>
             {/* Day headers */}
-            <div className="grid grid-cols-7 mb-2">
-              {["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"].map(
-                (day, idx) => (
+            <div className="flex">
+              {/* Empty cell for time column */}
+              <div className="w-12"></div>
+
+              {/* Day headers */}
+              <div className="flex-1 grid grid-cols-7 gap-2">
+                {dayNames.map((day, idx) => (
                   <div
                     key={day}
-                    className={`text-xs font-medium text-center py-1 ${
+                    className={`text-xs font-medium text-center ${
                       idx >= 5 ? "text-blue-400" : "text-gray-700"
                     }`}
                   >
                     {day}
                   </div>
-                )
-              )}
+                ))}
+              </div>
             </div>
 
-            {/* Heatmap grid */}
-            <div className="grid grid-cols-7 gap-1">
-              {Array.from({ length: 70 }, (_, i) => {
-                const hour = 8 + Math.floor(i / 7);
-                const day = i % 7;
-                const dataPoint = currentData.callHeatmapData.find(
-                  (d) => d[0] === hour && d[1] === day
-                );
-                if (!dataPoint) {
-                  return (
-                    <div
-                      key={i}
-                      className="aspect-square rounded-md bg-gray-50"
-                    />
-                  );
-                }
-                const value =
-                  heatmapView === "queued" ? dataPoint[2] : dataPoint[4];
-                const date = dataPoint[3];
-                const viewMax = Math.max(
-                  ...currentData.callHeatmapData.map((d) =>
-                    heatmapView === "queued" ? d[2] : d[4]
-                  )
-                );
-                const isHigh = value > viewMax * 0.7;
+            {/* Heatmap rows */}
+            {[8, 9, 10, 11, 12, 13, 14, 15, 16, 17].map((hour) => (
+              <div key={hour} className="flex items-center">
+                {/* Time label */}
+                <div className="w-12 text-xs text-gray-500 text-right pr-2">
+                  {hour}:00
+                </div>
 
-                const getImprovedHeatmapColor = (
-                  val: number,
-                  maxVal: number
-                ): string => {
-                  const intensity = Math.min(0.95, val / maxVal);
-                  if (intensity < 0.2) return "rgba(237, 246, 255, 0.95)";
-                  else if (intensity < 0.4) return "rgba(191, 219, 254, 0.95)";
-                  else if (intensity < 0.6) return "rgba(96, 165, 250, 0.95)";
-                  else if (intensity < 0.8) return "rgba(59, 130, 246, 0.95)";
-                  else return "rgba(30, 64, 175, 0.95)";
-                };
+                {/* Heatmap cells */}
+                <div className="flex-1 grid grid-cols-7 gap-2 my-1">
+                  {[0, 1, 2, 3, 4, 5, 6].map((day) => {
+                    const dataPoint = currentData.callHeatmapData.find(
+                      (d) => d[0] === hour && d[1] === day
+                    );
 
-                return (
-                  <div
-                    key={i}
-                    className="group relative aspect-square rounded-md flex items-center justify-center transition-all duration-150 hover:scale-105 cursor-pointer overflow-visible"
-                    style={{
-                      backgroundColor: getImprovedHeatmapColor(value, viewMax),
-                    }}
-                  >
-                    <span
-                      className={`text-xs font-medium ${
-                        isHigh ? "text-white" : "text-gray-700"
-                      }`}
-                    >
-                      {value > 0 ? value : ""}
-                    </span>
+                    if (!dataPoint) {
+                      return (
+                        <div
+                          key={`${hour}-${day}`}
+                          className="aspect-square rounded-md bg-gray-50 flex items-center justify-center"
+                        />
+                      );
+                    }
 
-                    {value > 0 && (
-                      <div className="absolute opacity-0 group-hover:opacity-100 bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-10 transition-opacity duration-150 pointer-events-none">
-                        <div className="bg-gray-800 text-white text-xs rounded py-1.5 px-2 min-w-max shadow-lg">
-                          <p className="font-medium">
-                            {
-                              [
-                                "Mandag",
-                                "Tirsdag",
-                                "Onsdag",
-                                "Torsdag",
-                                "Fredag",
-                                "Lørdag",
-                                "Søndag",
-                              ][day]
-                            }
-                            , {date}
-                          </p>
-                          <p>Kl. {hour}:00</p>
-                          <p className="font-medium mt-1">
-                            {heatmapView === "queued"
-                              ? `${value} opkald i kø`
-                              : `${value} besvarede opkald`}
-                          </p>
-                          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800" />
-                        </div>
+                    const value =
+                      heatmapView === "queued" ? dataPoint[2] : dataPoint[4];
+                    const date = dataPoint[3];
+                    const viewMax = Math.max(
+                      ...currentData.callHeatmapData.map((d) =>
+                        heatmapView === "queued" ? d[2] : d[4]
+                      )
+                    );
+                    const isHigh = value > viewMax * 0.7;
+
+                    return (
+                      <div
+                        key={`${hour}-${day}`}
+                        className="group relative aspect-square rounded-md flex items-center justify-center transition-all duration-150 hover:scale-105 cursor-pointer"
+                        style={{
+                          backgroundColor: getHeatmapColor(value, viewMax),
+                        }}
+                      >
+                        <span
+                          className={`text-xs font-medium ${
+                            isHigh ? "text-white" : "text-gray-700"
+                          }`}
+                        >
+                          {value > 0 ? value : ""}
+                        </span>
+
+                        {value > 0 && (
+                          <div className="absolute opacity-0 group-hover:opacity-100 bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-10 transition-opacity duration-150 pointer-events-none">
+                            <div className="bg-gray-800 text-white text-xs rounded py-1.5 px-2 min-w-max shadow-lg">
+                              <p className="font-medium">
+                                {fullDayNames[day]}, {date}
+                              </p>
+                              <p>Kl. {hour}:00</p>
+                              <p className="font-medium mt-1">
+                                {heatmapView === "queued"
+                                  ? `${value} opkald i kø`
+                                  : `${value} besvarede opkald`}
+                              </p>
+                              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800" />
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Hour markers */}
-            <div className="flex justify-between mt-2 px-2">
-              <span className="text-xs text-gray-500">8:00</span>
-              <span className="text-xs text-gray-500">10:00</span>
-              <span className="text-xs text-gray-500">12:00</span>
-              <span className="text-xs text-gray-500">14:00</span>
-              <span className="text-xs text-gray-500">16:00</span>
-            </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Heatmap Legend */}
-          <div className="mt-6 pt-4 border-t border-gray-100">
+          <div className="mt-8 pt-3 border-t border-gray-100">
             <p className="text-xs text-gray-500 mb-2">Intensitet:</p>
             <div className="flex items-center">
               <div
@@ -826,24 +837,24 @@ export const Calls: React.FC = () => {
                   />
                   <Legend />
                   <ReferenceLine
-                    y={75}
+                    y={currentData.serviceTargets.responseRate}
                     stroke="#6B7280"
                     strokeDasharray="3 3"
                     strokeWidth={1}
                     label={{
-                      value: "Mål: 75%",
+                      value: `Mål: ${currentData.serviceTargets.responseRate}%`,
                       position: "right",
                       fill: "#6B7280",
                       fontSize: 12,
                     }}
                   />
                   <ReferenceLine
-                    y={80}
+                    y={currentData.serviceTargets.serviceLevel}
                     stroke="#818CF8"
                     strokeDasharray="3 3"
                     strokeWidth={1}
                     label={{
-                      value: "SLA: 80%",
+                      value: `SLA: ${currentData.serviceTargets.serviceLevel}%`,
                       position: "right",
                       fill: "#818CF8",
                       fontSize: 12,
@@ -1023,9 +1034,11 @@ export const Calls: React.FC = () => {
                   <td className="px-4 py-2 text-sm font-medium">
                     <span
                       className={
-                        item.percentAnswered >= 75
+                        item.percentAnswered >=
+                        currentData.serviceTargets.responseRate
                           ? "text-green-600"
-                          : item.percentAnswered >= 50
+                          : item.percentAnswered >=
+                            currentData.serviceTargets.responseRate / 1.5
                           ? "text-yellow-600"
                           : "text-red-600"
                       }
@@ -1060,21 +1073,27 @@ export const Calls: React.FC = () => {
           <div className="space-y-2 mt-3">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Antal agenter:</span>
-              <span className="font-medium">12</span>
+              <span className="font-medium">
+                {currentData.agentStats.totalAgents}
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Gns. svartid pr. agent:</span>
-              <span className="font-medium">1:05 min</span>
+              <span className="font-medium">
+                {formatTime(currentData.agentStats.avgResponseTimePerAgent)}
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Gns. opkald pr. agent:</span>
               <span className="font-medium">
-                {Math.round(currentData.callCenterStats.total / 12)}
+                {currentData.agentStats.avgCallsPerAgent}
               </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Agent tilgængelighed:</span>
-              <span className="font-medium text-green-600">94%</span>
+              <span className="font-medium text-green-600">
+                {currentData.agentStats.agentAvailability}%
+              </span>
             </div>
           </div>
         </div>
@@ -1091,19 +1110,27 @@ export const Calls: React.FC = () => {
           <div className="space-y-2 mt-3">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Gns. ventetid alle opkald:</span>
-              <span className="font-medium">0:45 min</span>
+              <span className="font-medium">
+                {formatTime(currentData.timingMetrics.avgWaitTimeAllCalls)}
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Gns. samtaletid:</span>
-              <span className="font-medium">3:15 min</span>
+              <span className="font-medium">
+                {formatTime(currentData.timingMetrics.avgTalkTime)}
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Besvarede indenfor 30s:</span>
-              <span className="font-medium text-green-600">68%</span>
+              <span className="font-medium text-green-600">
+                {currentData.timingMetrics.percentAnsweredIn30Secs}%
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Gns. efterbehandlingstid:</span>
-              <span className="font-medium">1:20 min</span>
+              <span className="font-medium">
+                {formatTime(currentData.timingMetrics.avgAfterCallWork)}
+              </span>
             </div>
           </div>
         </div>
@@ -1120,37 +1147,45 @@ export const Calls: React.FC = () => {
               <span className="text-gray-600">SLA Performance:</span>
               <span
                 className={
-                  currentData.callCenterStats.percentAnsweredIn60Secs >= 80
+                  currentData.performanceMetrics.slaPerformance >=
+                  currentData.serviceTargets.serviceLevel
                     ? "font-medium text-green-600"
                     : "font-medium text-yellow-600"
                 }
               >
-                {currentData.callCenterStats.percentAnsweredIn60Secs >= 80
+                {currentData.performanceMetrics.slaPerformance >=
+                currentData.serviceTargets.serviceLevel
                   ? "✓"
                   : "⚠"}{" "}
-                {currentData.callCenterStats.percentAnsweredIn60Secs}%
+                {currentData.performanceMetrics.slaPerformance}%
               </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Trendfaktor:</span>
               <span
                 className={
-                  currentData.callStats[1].increasing
+                  currentData.performanceMetrics.trendDirection === "up"
                     ? "font-medium text-green-600"
                     : "font-medium text-red-600"
                 }
               >
-                {currentData.callStats[1].increasing ? "↑" : "↓"}{" "}
-                {currentData.callStats[1].change}
+                {currentData.performanceMetrics.trendDirection === "up"
+                  ? "↑"
+                  : "↓"}{" "}
+                {currentData.performanceMetrics.trendChange}
               </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">CSAT score:</span>
-              <span className="font-medium">4.2/5.0</span>
+              <span className="font-medium">
+                {currentData.performanceMetrics.csatScore}/5.0
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">FCR rate:</span>
-              <span className="font-medium">78%</span>
+              <span className="font-medium">
+                {currentData.performanceMetrics.fcrRate}%
+              </span>
             </div>
           </div>
         </div>
@@ -1158,7 +1193,7 @@ export const Calls: React.FC = () => {
       {/* Footer */}
       <div className="text-center text-xs text-gray-500 mt-10">
         <p>Call center rapport - {currentData.reportDateRange}</p>
-        <p className="mt-1">Generet: {reportGenerated}</p>
+        <p className="mt-1">Generet: {getReportGeneratedTime()}</p>
       </div>
     </div>
   );
