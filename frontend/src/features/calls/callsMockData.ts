@@ -91,6 +91,23 @@ export interface WaitTimeItem {
   numericAbandoned: number;
 }
 
+export interface CombinedActivityItem {
+  date: string;
+  time: string;
+  // Call metrics
+  queued: number;
+  presented: number;
+  answered: number;
+  answeredIn60Secs: number;
+  abandoned: number;
+  // Wait times
+  longestWait: string;
+  longestAnswer: string;
+  longestAbandoned: string;
+  // Performance
+  percentAnswered: number;
+}
+
 export interface AgentStats {
   totalAgents: number;
   avgResponseTimePerAgent: string;
@@ -121,9 +138,9 @@ export interface ServiceTargets {
 }
 
 // Updated HeatmapDataItem to include both queued and answered calls
-type HeatmapDataItem = [number, number, number, string, number]; // [hour, dayOfWeek, queued, date, answered]
+export type HeatmapDataItem = [number, number, number, string, number]; // [hour, dayOfWeek, queued, date, answered]
 
-interface TimeRangeData {
+export interface TimeRangeData {
   callCenterStats: CallCenterStats;
   callStats: CallStat[];
   donutData: DonutItem[];
@@ -138,6 +155,7 @@ interface TimeRangeData {
   agentStats: AgentStats;
   timingMetrics: TimingMetrics;
   performanceMetrics: PerformanceMetrics;
+  combinedActivityData: CombinedActivityItem[];
 }
 
 // Helper function to generate random call data
@@ -311,13 +329,10 @@ function generateWaitTimeData(days: number): WaitTimeItem[] {
     const dayOfWeek = currentDate.getDay();
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-    // Generate fewer entries for weekends and more for weekdays
-    const entries = isWeekend ? 1 : generateRandomCalls(2, 5);
+    // Generate different entries for each hour of the day
+    const hours = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
 
-    for (let j = 0; j < entries; j++) {
-      // Generate a random hour (8-17)
-      const hour = generateRandomCalls(8, 17);
-
+    hours.forEach((hour) => {
       // Higher wait times during peak hours
       const isPeakHour =
         (hour >= 9 && hour <= 11) || (hour >= 14 && hour <= 16);
@@ -350,7 +365,7 @@ function generateWaitTimeData(days: number): WaitTimeItem[] {
         numericAnswer: answerMinutes * 60 + answerSeconds,
         numericAbandoned: abandonedMinutes * 60 + abandonedSeconds,
       });
-    }
+    });
   }
 
   return result.sort((a, b) => {
@@ -496,15 +511,60 @@ function generateCallStats(
   ];
 }
 
-// Generate donut chart data
+// Function to combine daily activity and wait time data
+export function generateCombinedActivityData(
+  dailyActivity: DailyActivity[],
+  waitTimeData: WaitTimeItem[]
+): CombinedActivityItem[] {
+  return dailyActivity.map((activity) => {
+    // Find matching wait time data for the same date and time
+    const waitTime = waitTimeData.find(
+      (w) => w.date === activity.date && w.time === activity.time
+    ) || {
+      longestWait: "00:00:00",
+      longestAnswer: "00:00:00",
+      longestAbandoned: "00:00:00",
+    };
+
+    return {
+      date: activity.date,
+      time: activity.time,
+      // Call metrics
+      queued: activity.queued,
+      presented: activity.presented,
+      answered: activity.answered,
+      answeredIn60Secs: activity.answeredIn60Secs,
+      abandoned: activity.abandoned,
+      // Wait times
+      longestWait: waitTime.longestWait,
+      longestAnswer: waitTime.longestAnswer,
+      longestAbandoned: waitTime.longestAbandoned,
+      // Performance
+      percentAnswered: activity.percentAnswered,
+    };
+  });
+}
+
+// Generate donut chart data with all three segments
 function generateDonutData(stats: CallCenterStats): DonutItem[] {
+  const totalWithBounced = stats.total + stats.bounced;
+
   return [
     {
-      name: "Ubesvaret",
-      value: stats.abandoned / stats.total,
-      color: "#F97066",
+      name: "Besvaret",
+      value: stats.answered / totalWithBounced,
+      color: "#2DD4BF", // Teal/green for answered
     },
-    { name: "Besvaret", value: stats.answered / stats.total, color: "#2DD4BF" },
+    {
+      name: "Ubesvaret",
+      value: stats.abandoned / totalWithBounced,
+      color: "#F97066", // Red for abandoned/unanswered
+    },
+    {
+      name: "Afbrudte",
+      value: stats.bounced / totalWithBounced,
+      color: "#FFA600", // Orange for bounced calls
+    },
   ];
 }
 
@@ -555,6 +615,11 @@ function generateServiceTargets(): ServiceTargets {
   };
 }
 
+// Create a function to get current timestamp for the report generation
+export const getReportGeneratedTime = (): string => {
+  return format(new Date(), "dd-MM-yyyy, HH:mm");
+};
+
 // Generate data for all time periods
 const LAST_7_DAYS = generateDataForPeriod(7);
 const LAST_14_DAYS = generateDataForPeriod(14);
@@ -582,6 +647,28 @@ const WAIT_TIME_DATA_14_DAYS = generateWaitTimeData(14);
 const WAIT_TIME_DATA_30_DAYS = generateWaitTimeData(30);
 const WAIT_TIME_DATA_90_DAYS = generateWaitTimeData(90);
 const WAIT_TIME_DATA_YEAR = generateWaitTimeData(365);
+
+// Generate combined activity data
+const COMBINED_ACTIVITY_7_DAYS = generateCombinedActivityData(
+  DAILY_ACTIVITY_7_DAYS,
+  WAIT_TIME_DATA_7_DAYS
+);
+const COMBINED_ACTIVITY_14_DAYS = generateCombinedActivityData(
+  DAILY_ACTIVITY_14_DAYS,
+  WAIT_TIME_DATA_14_DAYS
+);
+const COMBINED_ACTIVITY_30_DAYS = generateCombinedActivityData(
+  DAILY_ACTIVITY_30_DAYS,
+  WAIT_TIME_DATA_30_DAYS
+);
+const COMBINED_ACTIVITY_90_DAYS = generateCombinedActivityData(
+  DAILY_ACTIVITY_90_DAYS,
+  WAIT_TIME_DATA_90_DAYS
+);
+const COMBINED_ACTIVITY_YEAR = generateCombinedActivityData(
+  DAILY_ACTIVITY_YEAR,
+  WAIT_TIME_DATA_YEAR
+);
 
 // Generate trend data
 const TREND_DATA_7_DAYS = generateTrendData(7);
@@ -648,11 +735,6 @@ const PERFORMANCE_METRICS_90_DAYS = generatePerformanceMetrics(
 );
 const PERFORMANCE_METRICS_YEAR = generatePerformanceMetrics(LAST_YEAR.stats);
 
-// Create a function to get current timestamp for the report generation
-export const getReportGeneratedTime = (): string => {
-  return format(new Date(), "dd-MM-yyyy, HH:mm");
-};
-
 // Export data with time ranges
 export const mockDataByTimeRange: Record<string, TimeRangeData> = {
   "Sidste 7 dage": {
@@ -670,6 +752,7 @@ export const mockDataByTimeRange: Record<string, TimeRangeData> = {
     agentStats: AGENT_STATS_7_DAYS,
     timingMetrics: TIMING_METRICS_7_DAYS,
     performanceMetrics: PERFORMANCE_METRICS_7_DAYS,
+    combinedActivityData: COMBINED_ACTIVITY_7_DAYS,
   },
   "Sidste 14 dage": {
     companyName: "Sundk callcenter",
@@ -686,6 +769,7 @@ export const mockDataByTimeRange: Record<string, TimeRangeData> = {
     agentStats: AGENT_STATS_14_DAYS,
     timingMetrics: TIMING_METRICS_14_DAYS,
     performanceMetrics: PERFORMANCE_METRICS_14_DAYS,
+    combinedActivityData: COMBINED_ACTIVITY_14_DAYS,
   },
   "Sidste 30 dage": {
     companyName: "Sundk callcenter",
@@ -702,6 +786,7 @@ export const mockDataByTimeRange: Record<string, TimeRangeData> = {
     agentStats: AGENT_STATS_30_DAYS,
     timingMetrics: TIMING_METRICS_30_DAYS,
     performanceMetrics: PERFORMANCE_METRICS_30_DAYS,
+    combinedActivityData: COMBINED_ACTIVITY_30_DAYS,
   },
   "Sidste 90 dage": {
     companyName: "Sundk callcenter",
@@ -718,6 +803,7 @@ export const mockDataByTimeRange: Record<string, TimeRangeData> = {
     agentStats: AGENT_STATS_90_DAYS,
     timingMetrics: TIMING_METRICS_90_DAYS,
     performanceMetrics: PERFORMANCE_METRICS_90_DAYS,
+    combinedActivityData: COMBINED_ACTIVITY_90_DAYS,
   },
   "Sidste år": {
     companyName: "Sundk callcenter",
@@ -734,6 +820,7 @@ export const mockDataByTimeRange: Record<string, TimeRangeData> = {
     agentStats: AGENT_STATS_YEAR,
     timingMetrics: TIMING_METRICS_YEAR,
     performanceMetrics: PERFORMANCE_METRICS_YEAR,
+    combinedActivityData: COMBINED_ACTIVITY_YEAR,
   },
 };
 
@@ -747,7 +834,7 @@ export const reportDateRange = LAST_7_DAYS.dateRange;
 export const waitTimeData = WAIT_TIME_DATA_7_DAYS;
 export const dailyCallActivity = DAILY_ACTIVITY_7_DAYS;
 export const callHeatmapData = HEATMAP_DATA_7_DAYS;
-export const reportGenerated = getReportGeneratedTime();
+export const combinedActivityData = COMBINED_ACTIVITY_7_DAYS;
 
 // Export available time ranges
 export const availableTimeRanges = [

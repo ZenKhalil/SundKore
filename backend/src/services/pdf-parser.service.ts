@@ -123,7 +123,13 @@ export class PDFParserService {
       console.log(`Found ${activityTable.length} rows in activity table`);
 
       for (const row of activityTable) {
-        if (row.length < 8) continue;
+        // Debug row structure to ensure we're accessing the right indices
+        console.log("Row data:", row);
+
+        if (row.length < 11) {
+          console.log("Row too short, skipping:", row);
+          continue; // Skip rows that don't have enough columns
+        }
 
         // Extract date and time
         const dateTime = row[0];
@@ -139,6 +145,7 @@ export class PDFParserService {
         // [5] = Calls Presented
         // [6] = Calls Answered
         // [7] = Calls Answered In 60 secs
+        // [10] = Calls Bounced (verified from your table)
 
         const item: CombinedActivityItem = {
           date,
@@ -148,12 +155,17 @@ export class PDFParserService {
           answered: parseInt(row[6]) || 0,
           answeredIn60Secs: parseInt(row[7]) || 0,
           abandoned: parseInt(row[4]) || 0,
-          bounced: parseInt(row[10]) || 0, 
+          bounced: parseInt(row[11]) || 0, 
           longestWait: "00:00:00",
           longestAnswer: "00:00:00",
           longestAbandoned: "00:00:00",
           percentAnswered: 0,
         };
+
+        // Log the parsed bounce value for debugging
+        console.log(
+          `Parsed bounce value from column 10: ${row[10]} => ${item.bounced}`
+        );
 
         // Calculate percentage
         if (item.queued > 0) {
@@ -185,7 +197,12 @@ export class PDFParserService {
     }
 
     console.log(`Parsed ${items.length} complete data items`);
+
+    // Debug output to check the bounced calls values
+    items.forEach((item) => {
+      console.log(`${item.date}, ${item.time}: Bounced = ${item.bounced}`);
+    });
+
     return items;
   }
 }
-

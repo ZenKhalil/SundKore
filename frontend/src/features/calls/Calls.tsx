@@ -116,6 +116,14 @@ export const Calls: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  // State for Activity Chart
+  const [activityData, setActivityData] = useState<Record<
+    string,
+    any[]
+  > | null>(null);
+  const [activityPeriod, setActivityPeriod] = useState("weekly");
+  const [chartType, setChartType] = useState("stacked");
+
   // Time filter state
   const [timeFrame, setTimeFrame] = useState("Sidste 30 dage");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -127,10 +135,6 @@ export const Calls: React.FC = () => {
     end: "",
   });
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
-
-  // Activity chart state - for the improved activity chart
-  const [activityPeriod, setActivityPeriod] = useState("weekly");
-  const [chartType, setChartType] = useState("stacked");
 
   // Other state
   const [heatmapView, setHeatmapView] = useState<"queued" | "answered">(
@@ -157,7 +161,7 @@ export const Calls: React.FC = () => {
     "Sidste 7 dage",
     "Sidste 30 dage",
     "Sidste 90 dage",
-    "I år"  
+    "I år",
   ];
 
   // Generate month options
@@ -184,59 +188,284 @@ export const Calls: React.FC = () => {
   const dayNames = ["Man", "Tir", "Ons", "Tor", "Fre"];
   const fullDayNames = ["Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag"];
 
-  // Activity chart helper functions
+  // ===== ACTIVITY CHART HELPER FUNCTIONS =====
+
+  // Format date as DD-MM
+  const formatDateDDMM = (date: Date): string => {
+    const day = date.getDate().toString().padStart(2, "0");
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    return `${day}-${month}`;
+  };
+
+  // Get activity data based on period
   const getActivityData = () => {
     if (!currentData) return [];
 
+    // Check if we already have cached data for this period
+    if (activityData && activityData[activityPeriod]) {
+      return activityData[activityPeriod];
+    }
+
+    // Generate the appropriate data
+    let periodData;
     switch (activityPeriod) {
       case "weekly":
-        return currentData.weeklyCallActivity || [];
+        periodData = currentData.weeklyCallActivity || [];
+        break;
       case "monthly":
-        return currentData.monthlyCallActivity || generateMonthlyData();
+        periodData = generateProperPeriodData(
+          currentData.combinedActivityData,
+          30
+        );
+        break;
       case "yearly":
-        return currentData.yearlyCallActivity || generateYearlyData();
-      case "custom":
-        return currentData.customCallActivity || [];
+        periodData = generateProperYearlyData(currentData.combinedActivityData);
+        break;
       default:
-        return currentData.weeklyCallActivity || [];
+        periodData = currentData.weeklyCallActivity || [];
     }
+
+    // Cache the data for future use
+    setActivityData((prev) => ({
+      ...prev,
+      [activityPeriod]: periodData,
+    }));
+
+    return periodData;
   };
 
-  const getActivityPeriodLabel = () => {
-    switch (activityPeriod) {
-      case "weekly":
-        return "Seneste 7 dage";
-      case "monthly":
-        return "Seneste 30 dage";
-      case "yearly":
-        return "Seneste 12 måneder";
-      case "custom":
-        return `${customDateRange.start} - ${customDateRange.end}`;
-      default:
-        return "Seneste 7 dage";
+  // Generate data for a specific period (days)
+  const generateProperPeriodData = (
+    combinedData: ExtendedCombinedActivityItem[],
+    days = 30
+  ) => {
+    if (!combinedData || !combinedData.length) return [];
+
+    // Create a map to group by day
+    const dailyData = new Map();
+
+    // Extract dates directly from data to get actual min/max dates in the filtered dataset
+    const dates = combinedData.map((item) => {
+      const [day, month, year] = item.date.split("-").map(Number);
+      return new Date(year, month - 1, day);
+    });
+
+    // Get actual date range from the data
+    dates.sort((a, b) => a.getTime() - b.getTime());
+    const minDate = dates.length > 0 ? new Date(dates[0]) : new Date();
+    const maxDate =
+      dates.length > 0 ? new Date(dates[dates.length - 1]) : new Date();
+
+    // Initialize all days in the actual data range
+    const daysDiff =
+      Math.ceil(
+        (maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)
+      ) + 1;
+    for (let i = 0; i < daysDiff; i++) {
+      const date = new Date(minDate);
+      date.setDate(minDate.getDate() + i);
+
+      // Format key as DD-MM for display
+      const dayMonth = formatDateDDMM(date);
+
+      dailyData.set(dayMonth, {
+        name: dayMonth,
+        date: new Date(date), // Keep full date for sorting
+        besvaret: 0,
+        ubesvaret: 0,
+        abandoned: 0,
+        afbrudte: 0, // Add specific tracking for bounced calls
+      });
     }
+
+    // Initialize daily totals for calculation verification
+    let totalPresented = 0;
+    let totalAnswered = 0;
+    let totalAbandoned = 0;
+    let totalBounced = 0;
+
+    // Populate with actual data
+    combinedData.forEach((item) => {
+      try {
+        const [day, month, year] = item.date.split("-").map(Number);
+        const itemDate = new Date(year, month - 1, day);
+        const key = formatDateDDMM(itemDate);
+
+        // Track totals for verification
+        totalPresented += item.presented;
+        totalAnswered += item.answered;
+        totalAbandoned += item.abandoned;
+        totalBounced += item.bounced || 0;
+
+        if (dailyData.has(key)) {
+          const entry = dailyData.get(key);
+          entry.besvaret += item.answered;
+          entry.abandoned += item.abandoned;
+          entry.afbrudte += item.bounced || 0;
+
+          // For chart display, combine abandoned and bounced into ubesvaret
+          entry.ubesvaret = entry.abandoned + entry.afbrudte;
+        }
+      } catch (error) {
+        console.error(`Error processing date: ${item.date}`, error);
+      }
+    });
+
+    // Log verification totals to match against main dashboard
+    console.log("Activity Data Totals:", {
+      presented: totalPresented,
+      answered: totalAnswered,
+      abandoned: totalAbandoned,
+      bounced: totalBounced,
+      timeRange: `${formatDateDDMM(minDate)} - ${formatDateDDMM(maxDate)}`,
+    });
+
+    // Convert map to array and sort by date
+    return Array.from(dailyData.values())
+      .sort((a, b) => a.date.getTime() - b.date.getTime())
+      .map(({ date, ...rest }) => rest); // Remove date used for sorting
   };
 
+  // Generate yearly data from actual data
+  const generateProperYearlyData = (
+    combinedData: ExtendedCombinedActivityItem[]
+  ) => {
+    if (!combinedData || !combinedData.length) return [];
+
+    // Use the month labels from monthOptions
+    const monthsMap: Record<number, string> = {};
+    monthOptions.forEach((month) => {
+      monthsMap[parseInt(month.value)] = month.label.substring(0, 3); // Use first 3 chars as short month name
+    });
+
+    // Create a map to group by month
+    const monthlyData = new Map();
+
+    // Extract dates from the filtered data to determine actual range
+    const dates = combinedData.map((item) => {
+      const [day, month, year] = item.date.split("-").map(Number);
+      return new Date(year, month - 1, day);
+    });
+
+    // Sort dates and get min/max
+    dates.sort((a, b) => a.getTime() - b.getTime());
+    const minDate = dates.length > 0 ? new Date(dates[0]) : new Date();
+    const maxDate =
+      dates.length > 0 ? new Date(dates[dates.length - 1]) : new Date();
+
+    // Calculate number of months between min and max dates
+    const monthDiff =
+      (maxDate.getFullYear() - minDate.getFullYear()) * 12 +
+      maxDate.getMonth() -
+      minDate.getMonth() +
+      1;
+
+    // Initialize all months in the actual data range
+    for (let i = 0; i < monthDiff; i++) {
+      const date = new Date(minDate);
+      date.setMonth(minDate.getMonth() + i);
+
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      const monthKey = `${year}-${month}`;
+      const shortMonth = monthsMap[month] || month.toString();
+
+      monthlyData.set(monthKey, {
+        name: shortMonth,
+        sortKey: monthKey, // For sorting
+        besvaret: 0,
+        ubesvaret: 0,
+        abandoned: 0,
+        afbrudte: 0,
+      });
+    }
+
+    // Initialize monthly totals for verification
+    let totalPresented = 0;
+    let totalAnswered = 0;
+    let totalAbandoned = 0;
+    let totalBounced = 0;
+
+    // Populate with actual data
+    combinedData.forEach((item) => {
+      try {
+        const [day, month, year] = item.date.split("-").map(Number);
+        const itemDate = new Date(year, month - 1, day);
+        const key = `${itemDate.getFullYear()}-${itemDate.getMonth() + 1}`;
+
+        // Track totals for verification
+        totalPresented += item.presented;
+        totalAnswered += item.answered;
+        totalAbandoned += item.abandoned;
+        totalBounced += item.bounced || 0;
+
+        if (monthlyData.has(key)) {
+          const entry = monthlyData.get(key);
+          entry.besvaret += item.answered;
+          entry.abandoned += item.abandoned;
+          entry.afbrudte += item.bounced || 0;
+
+          // For chart display, combine abandoned and bounced into ubesvaret
+          entry.ubesvaret = entry.abandoned + entry.afbrudte;
+        }
+      } catch (error) {
+        console.error(`Error processing date: ${item.date}`, error);
+      }
+    });
+
+    // Log verification totals to match against main dashboard
+    console.log("Yearly Activity Data Totals:", {
+      presented: totalPresented,
+      answered: totalAnswered,
+      abandoned: totalAbandoned,
+      bounced: totalBounced,
+      timeRange: `${formatDateDDMM(minDate)} - ${formatDateDDMM(maxDate)}`,
+    });
+
+    // Convert map to array and sort by date
+    const result = Array.from(monthlyData.values()).sort((a, b) => {
+      const [yearA, monthA] = a.sortKey.split("-").map(Number);
+      const [yearB, monthB] = b.sortKey.split("-").map(Number);
+
+      if (yearA !== yearB) return yearA - yearB;
+      return monthA - monthB;
+    });
+
+    // Remove the sortKey property
+    return result.map(({ sortKey, ...rest }) => rest);
+  };
+
+  // Calculate total calls - use the SAME total as the main dashboard
   const getTotalCalls = () => {
-    const data = getActivityData();
-    return data.reduce(
-      (sum: number, item: any) =>
-        sum +
-        (item.besvaret || 0) +
-        (item.ubesvaret || 0) +
-        (item.abandoned || 0),
-      0
-    );
-  };
+    // Use the same value from the main dashboard stats
+    if (currentData?.callCenterStats?.presented) {
+      return currentData.callCenterStats.presented;
+    }
 
-  const getAnswerRate = () => {
+    // Fallback to calculated value only if stats aren't available
     const data = getActivityData();
     const total = data.reduce(
       (sum: number, item: any) =>
-        sum +
-        (item.besvaret || 0) +
-        (item.ubesvaret || 0) +
-        (item.abandoned || 0),
+        sum + (item.besvaret || 0) + (item.ubesvaret || 0),
+      0
+    );
+
+    return total;
+  };
+
+  // Calculate answer rate - match the main dashboard percentage
+  const getAnswerRate = () => {
+    // Use the same calculation as the main dashboard
+    if (currentData?.callCenterStats) {
+      const { answered, presented } = currentData.callCenterStats;
+      return presented > 0 ? Math.round((answered / presented) * 100) : 0;
+    }
+
+    // Fallback calculation only if stats aren't available
+    const data = getActivityData();
+    const total = data.reduce(
+      (sum: number, item: any) =>
+        sum + (item.besvaret || 0) + (item.ubesvaret || 0),
       0
     );
     const answered = data.reduce(
@@ -246,62 +475,101 @@ export const Calls: React.FC = () => {
     return total > 0 ? Math.round((answered / total) * 100) : 0;
   };
 
+  // Calculate average daily calls based on dashboard data
   const getAverageDailyCalls = () => {
+    // First, get total calls from dashboard data
     const total = getTotalCalls();
-    const days = getActivityData().length;
-    return days > 0 ? Math.round(total / days) : 0;
+
+    // Get date range from currentData if available
+    if (currentData?.reportDateRange) {
+      const rangeParts = currentData.reportDateRange.split(" - ");
+      if (rangeParts.length === 2) {
+        try {
+          const [startDay, startMonth, startYear] = rangeParts[0]
+            .split("-")
+            .map(Number);
+          const [endDay, endMonth, endYear] = rangeParts[1]
+            .split("-")
+            .map(Number);
+
+          const startDate = new Date(startYear, startMonth - 1, startDay);
+          const endDate = new Date(endYear, endMonth - 1, endDay);
+
+          // Calculate actual days in range
+          const daysDiff =
+            Math.ceil(
+              (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+            ) + 1;
+          return Math.round(total / daysDiff);
+        } catch (error) {
+          console.error("Error parsing date range:", error);
+        }
+      }
+    }
+
+    // Fallback to period-based calculation
+    let divisor;
+    switch (activityPeriod) {
+      case "weekly":
+        divisor = 7;
+        break;
+      case "monthly":
+        divisor = 30;
+        break;
+      case "yearly":
+        const now = new Date();
+        const isLeapYear = new Date(now.getFullYear(), 1, 29).getDate() === 29;
+        divisor = isLeapYear ? 366 : 365;
+        break;
+      default:
+        divisor = getActivityData().length || 1;
+    }
+
+    return Math.round(total / divisor);
   };
 
+  // Get consistent total for bar tooltip calculations
   const getTotalForBar = (dataPoint: any) => {
+    // Include all relevant categories
     return (
       (dataPoint.besvaret || 0) +
       (dataPoint.ubesvaret || 0) +
-      (dataPoint.abandoned || 0)
+      (dataPoint.afbrudte || 0)
     );
   };
 
-  // Sample data generators
-  const generateMonthlyData = () => {
-    const data = [];
-    for (let i = 29; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      data.push({
-        name: date.toLocaleDateString("da-DK", {
-          day: "numeric",
-          month: "short",
-        }),
-        besvaret: Math.floor(Math.random() * 100) + 50,
-        ubesvaret: Math.floor(Math.random() * 20) + 5,
-        abandoned: Math.floor(Math.random() * 15) + 3,
-      });
+  // Get accurate date range for the selected period based on actual data
+  const getActivityPeriodLabel = () => {
+    // If we have the report date range, use that
+    if (currentData?.reportDateRange) {
+      return currentData.reportDateRange;
     }
-    return data;
-  };
 
-  const generateYearlyData = () => {
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "Maj",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Okt",
-      "Nov",
-      "Dec",
-    ];
-    return months.map((month) => ({
-      name: month,
-      besvaret: Math.floor(Math.random() * 1000) + 500,
-      ubesvaret: Math.floor(Math.random() * 200) + 50,
-      abandoned: Math.floor(Math.random() * 150) + 30,
-    }));
-  };
+    // Otherwise generate based on period
+    const today = new Date();
 
+    switch (activityPeriod) {
+      case "weekly": {
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() - 6);
+        return `${formatDateDDMM(weekStart)} - ${formatDateDDMM(today)}`;
+      }
+      case "monthly": {
+        const monthStart = new Date(today);
+        monthStart.setDate(today.getDate() - 29);
+        return `${formatDateDDMM(monthStart)} - ${formatDateDDMM(today)}`;
+      }
+      case "yearly": {
+        const yearStart = new Date(today);
+        yearStart.setFullYear(today.getFullYear() - 1);
+        yearStart.setDate(today.getDate() + 1);
+        return `${formatDateDDMM(yearStart)} - ${formatDateDDMM(today)}`;
+      }
+      default:
+        return "Seneste 7 dage";
+    }
+  };
+  
   // Function to filter data based on selected time frame
   const filterDataByTimeFrame = (data: TransformedData): TransformedData => {
     if (!data) return data;
@@ -373,7 +641,6 @@ export const Calls: React.FC = () => {
   // Function to recalculate call stats from filtered data
   const recalculateCallStats = (data: ExtendedCombinedActivityItem[]) => {
     // Log the data to see what's coming in
-    console.log("Data being processed:", data);
     const totals = data.reduce(
       (acc, item) => ({
         presented: acc.presented + item.presented,
@@ -593,8 +860,7 @@ export const Calls: React.FC = () => {
 
   // Helper function to generate weekly activity
   const generateWeeklyActivity = (data: ExtendedCombinedActivityItem[]) => {
-    const weekDays = ["Man", "Tir", "Ons", "Tor", "Fre"];
-    const activity = weekDays.map((day) => ({
+    const activity = dayNames.map((day) => ({
       name: day,
       besvaret: 0,
       ubesvaret: 0,
@@ -602,13 +868,25 @@ export const Calls: React.FC = () => {
     }));
 
     data.forEach((item) => {
-      const [day, month, year] = item.date.split("-").map(Number);
-      const date = new Date(year, month - 1, day);
-      const dayOfWeek = (date.getDay() + 6) % 7;
+      try {
+        const [day, month, year] = item.date.split("-").map(Number);
+        const date = new Date(year, month - 1, day);
+        const dayOfWeek = (date.getDay() + 6) % 7; // Convert to Monday-based index
 
-      activity[dayOfWeek].besvaret += item.answered;
-      activity[dayOfWeek].ubesvaret += item.abandoned;
-      activity[dayOfWeek].abandoned += item.abandoned;
+        // Only include weekdays (0 = Monday to 4 = Friday)
+        if (dayOfWeek < dayNames.length) {
+          activity[dayOfWeek].besvaret += item.answered;
+          activity[dayOfWeek].ubesvaret += item.abandoned;
+          activity[dayOfWeek].abandoned += item.abandoned;
+
+          // Include bounced calls in ubesvaret if available
+          if (item.bounced) {
+            activity[dayOfWeek].ubesvaret += item.bounced;
+          }
+        }
+      } catch (error) {
+        console.error(`Error processing date: ${item.date}`, error);
+      }
     });
 
     return activity;
@@ -845,8 +1123,8 @@ export const Calls: React.FC = () => {
           return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
         }
 
-        const aString = aValue.toString();
-        const bString = bValue.toString();
+        const aString = aValue?.toString() || "";
+        const bString = bValue?.toString() || "";
 
         return sortDirection === "asc"
           ? aString.localeCompare(bString)
@@ -862,6 +1140,7 @@ export const Calls: React.FC = () => {
     if (data.length === 0) return "00:00";
 
     const totalSeconds = data.reduce((sum, item) => {
+      if (!item.longestWait) return sum;
       const [hours, minutes, seconds] = item.longestWait.split(":").map(Number);
       return sum + hours * 3600 + minutes * 60 + seconds;
     }, 0);
@@ -987,6 +1266,11 @@ export const Calls: React.FC = () => {
   useEffect(() => {
     fetchCallData();
   }, []);
+
+  // Effect to clear activity data cache when time frame changes
+  useEffect(() => {
+    setActivityData(null);
+  }, [timeFrame, customDateRange]);
 
   // Compute filtered data based on time frame
   const currentData = rawData ? filterDataByTimeFrame(rawData) : null;
@@ -1219,7 +1503,7 @@ export const Calls: React.FC = () => {
             </h3>
           </div>
           <div className="mt-1 text-center">
-            <p className="text-2xl font-bold text-gray-900">
+            <p className="text-3xl font-bold text-gray-900">
               {currentData.callCenterStats.percentAnsweredIn60SecsOfAnswered}%
             </p>
           </div>
@@ -1249,7 +1533,7 @@ export const Calls: React.FC = () => {
             <h3 className="text-sm font-medium text-gray-500">Svarprocent</h3>
           </div>
           <div className="mt-1 text-center">
-            <p className="text-2xl font-bold text-gray-900">
+            <p className="text-3xl font-bold text-gray-900">
               {Math.round(
                 (currentData.callCenterStats.answered /
                   currentData.callCenterStats.presented) *
@@ -1257,19 +1541,6 @@ export const Calls: React.FC = () => {
               ) || 0}
               %
             </p>
-            <div className="text-xs text-gray-500 mt-1">
-              <span
-                className={
-                  currentData.callStats[1].increasing
-                    ? "text-green-600"
-                    : "text-red-600"
-                }
-              >
-                {currentData.callStats[1].increasing ? "↑" : "↓"}{" "}
-                {currentData.callStats[1].change}
-              </span>{" "}
-              fra forrige periode
-            </div>
           </div>
           <div className="mt-auto pt-2">
             <div className="w-full bg-gray-200 rounded-full h-2">
@@ -1305,26 +1576,18 @@ export const Calls: React.FC = () => {
             </h3>
           </div>
           <div className="mt-1 text-center">
-            <p className="text-2xl font-bold text-gray-900">
+            <p className="text-3xl font-bold text-gray-900">
               {formatTime(currentData.callCenterStats.longestWaitTime)}
             </p>
           </div>
           <div className="mt-auto pt-2">
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <div className="text-center">
                 <div className="text-xs font-medium text-gray-500">
                   Gns. ventetid
                 </div>
                 <div className="text-sm font-semibold text-gray-700">
                   {formatTime(currentData.callCenterStats.avgWaitTime)}
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-xs font-medium text-gray-500">
-                  Gns. taletid
-                </div>
-                <div className="text-sm font-semibold text-gray-700">
-                  {formatTime(currentData.callCenterStats.avgTalkTime)}
                 </div>
               </div>
               <div className="text-center">
@@ -1346,11 +1609,11 @@ export const Calls: React.FC = () => {
               <PhoneOff size={16} />
             </div>
             <h3 className="text-sm font-medium text-gray-500">
-              Frafaldsprocent
+              Ubesvaretprocent
             </h3>
           </div>
           <div className="mt-1 text-center">
-            <p className="text-2xl font-bold text-gray-900">
+            <p className="text-3xl font-bold text-gray-900">
               {Math.round(
                 (currentData.callCenterStats.abandoned /
                   currentData.callCenterStats.presented) *
@@ -1393,13 +1656,7 @@ export const Calls: React.FC = () => {
             </h3>
           </div>
           <div className="mt-1 text-center">
-            {/* Debug info - remove after testing */}
-            <div className="text-xs text-gray-400">
-              bounced: {currentData.callCenterStats.bounced}, presented:{" "}
-              {currentData.callCenterStats.presented}
-            </div>
-
-            <p className="text-2xl font-bold text-gray-900">
+            <p className="text-3xl font-bold text-gray-900">
               {Math.round(
                 ((currentData.callCenterStats.bounced || 0) /
                   currentData.callCenterStats.presented) *
@@ -1435,7 +1692,7 @@ export const Calls: React.FC = () => {
       </div>
 
       {/* Combined Section: Donut Chart + Målinger + Ugentlig aktivitet & Heatmap */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-3">
         {/* LEFT STACK: Donut → Målinger → Ugentlig aktivitet */}
         <div className="flex flex-col space-y-2">
           {/* Donut Chart */}
@@ -1499,25 +1756,12 @@ export const Calls: React.FC = () => {
               ))}
             </div>
 
-            <div className="grid grid-cols-2 gap-3 mt-4">
-              <div className="bg-gray-50 p-2 rounded border border-gray-200">
-                <div className="text-xs text-gray-500">Gns. tid på opgave</div>
-                <div className="text-sm font-semibold">
-                  {formatTime(currentData.callCenterStats.avgTaskTime)}
-                </div>
-              </div>
-              <div className="bg-gray-50 p-2 rounded border border-gray-200">
-                <div className="text-xs text-gray-500">Gns. tid i kø</div>
-                <div className="text-sm font-semibold">
-                  {formatTime(currentData.callCenterStats.avgQueueTime)}
-                </div>
-              </div>
-            </div>
+            <div className="grid grid-cols-2 gap-3 mt-4"></div>
           </div>
 
           {/* Ugentlig aktivitet - Improved version */}
-          <div className="bg-white rounded-xl shadow-sm p-4">
-            <div className="flex justify-between items-center mb-4">
+          <div className="bg-white rounded-xl shadow-sm p-2">
+            <div className="flex justify-between items-center mb-2">
               <div className="flex items-center">
                 <div className="p-2 rounded-md bg-indigo-50 text-indigo-600 mr-2">
                   <BarChart3 size={16} />
@@ -1562,7 +1806,7 @@ export const Calls: React.FC = () => {
             </div>
 
             {/* Info section */}
-            <div className="mb-4 flex items-center justify-between">
+            <div className=" flex items-center justify-between">
               <div className="text-xs text-gray-500 flex items-center">
                 <Info size={12} className="mr-1" />
                 Viser data for: {getActivityPeriodLabel()}
@@ -1596,10 +1840,10 @@ export const Calls: React.FC = () => {
             </div>
 
             {/* Chart */}
-            <ResponsiveContainer width="100%" height={240}>
+            <ResponsiveContainer width="100%" height={210}>
               <BarChart
                 data={getActivityData()}
-                margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
+                margin={{ top: 2, right: 30, left: 0, bottom: 0 }}
                 barGap={chartType === "grouped" ? 4 : 0}
                 barCategoryGap={chartType === "grouped" ? "20%" : "10%"}
               >
@@ -1676,9 +1920,16 @@ export const Calls: React.FC = () => {
                     name,
                   ]}
                 />
-
-                <Legend verticalAlign="top" height={36} iconType="circle" />
-
+                <Legend
+                  verticalAlign="top"
+                  height={20}
+                  iconType="circle"
+                  iconSize={11}
+                  formatter={(value) => (
+                    <span style={{ fontSize: "13px" }}>{value}</span>
+                  )}
+                  wrapperStyle={{ top: -7 }}
+                />
                 <Bar
                   dataKey="besvaret"
                   fill="url(#colorBesvaret)"
@@ -1691,7 +1942,7 @@ export const Calls: React.FC = () => {
                   fill="url(#colorAbandoned)"
                   radius={chartType === "stacked" ? [0, 0, 0, 0] : [4, 4, 0, 0]}
                   stackId={chartType === "stacked" ? "a" : undefined}
-                  name="Frafaldet"
+                  name="Afbrudte"
                 />
                 <Bar
                   dataKey="ubesvaret"
@@ -1704,7 +1955,7 @@ export const Calls: React.FC = () => {
             </ResponsiveContainer>
 
             {/* Summary stats */}
-            <div className="mt-4 pt-3 border-t border-gray-100 grid grid-cols-3 gap-4">
+            <div className="pt-1 border-t border-gray-100 grid grid-cols-3 gap-4">
               <div className="text-center">
                 <p className="text-xs text-gray-500">Total opkald</p>
                 <p className="text-lg font-semibold text-gray-900">

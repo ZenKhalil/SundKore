@@ -116,7 +116,7 @@ export class CallService {
   private transformCallData(callData: CombinedActivityItem[]): CallCenterData {
     // Calculate basic metrics
     const totalCalls = callData.reduce((sum, item) => sum + item.queued, 0);
-    
+
     const answeredCalls = callData.reduce(
       (sum, item) => sum + item.answered,
       0
@@ -134,10 +134,12 @@ export class CallService {
       0
     );
 
-    const bouncedCalls = callData.reduce(
-      (sum, item) => sum + item.bounced,
-      0
-    );
+    const bouncedCalls = callData.reduce((sum, item) => {
+      console.log(
+        `Adding ${item.bounced} bounced calls from ${item.date}, ${item.time}`
+      );
+      return sum + (item.bounced || 0);
+    }, 0);
 
     const callCenterStats: CallCenterStats = {
       total: totalCalls,
@@ -156,7 +158,7 @@ export class CallService {
           : 0,
       percentBounced:
         presentedCalls > 0
-          ? Math.round((bouncedCalls / presentedCalls) * 100)
+          ? Math.round((bouncedCalls / presentedCalls) * 100) // Make sure percentage is calculated correctly
           : 0,
       percentAnsweredIn60Secs:
         presentedCalls > 0
@@ -171,7 +173,7 @@ export class CallService {
       longestWaitAbandoned: this.getMaxTime(callData, "longestAbandoned"),
       avgWaitTime: this.calculateAverageTime(callData, "longestWait"),
       avgTalkTime: this.calculateAverageTime(callData, "longestAnswer"),
-      avgTaskTime: this.calculateAverageTime(callData, "longestAnswer"), // For now, same as talk time
+      avgTaskTime: this.calculateAverageTime(callData, "longestAnswer"),
       avgQueueTime: this.calculateAverageTime(callData, "longestWait"),
       callsPerHour: this.calculateCallsPerHour(callData),
     };
