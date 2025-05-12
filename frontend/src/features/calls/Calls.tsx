@@ -2183,18 +2183,18 @@ export const Calls: React.FC = () => {
           </div>
 
           <div className="h-[300px] flex flex-col">
-            <div className="h-[85%]">
+            <div className="h-[100%]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
                   data={currentData.responseRateTrend}
-                  margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
+                  margin={{ top: 5, right: 60, left: 0, bottom: 2 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis
                     dataKey="day"
                     axisLine={false}
                     tickLine={false}
-                    padding={{ left: 10, right: 10 }}
+                    padding={{ left: 5, right: 5 }}
                     tick={{ fontSize: "0.85rem" }}
                   />
                   <YAxis
