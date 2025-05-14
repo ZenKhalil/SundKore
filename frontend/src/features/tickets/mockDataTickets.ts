@@ -11,7 +11,7 @@ import type {
   AgentPerformance,
   VolumeTrendData,
   FrameOption,
-} from "./ticketTypes";
+} from "./types";
 
 // Stats overview data
 export const ticketsStatsData: TicketsStatsData = {
