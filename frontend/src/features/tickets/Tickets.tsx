@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 
 import TicketsTable from "./TicketsTable";
-import type { RenderLabelProps } from "./ticketTypes";
+import type { RenderLabelProps } from "./types";
 import {
   ticketsStatsData,
   donutData,
