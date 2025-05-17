@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zendesk API Test Dashboard</title>
+    <style>
+        :root {
+            --primary: #3182ce;
+            --primary-dark: #2b6cb0;
+            --success: #38a169;
+            --success-light: #f0fff4;
+            --error: #e53e3e;
+            --error-light: #fff5f5;
+            --warning: #dd6b20;
+            --warning-light: #fffaf0;
+            --info: #4299e1;
+            --info-light: #ebf8ff;
+            --bg: #f7f9fc;
+            --text: #2d3748;
+            --text-light: #718096;
+            --border: #e2e8f0;
+            --card-bg: white;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 15px;
+        }
+
+        h1, h2, h3 {
+            color: var(--text);
+            margin-bottom: 0.5em;
+        }
+
+        .config-status {
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+            padding: 8px 12px;
+            border-radius: 4px;
+            background-color: var(--info-light);
+        }
+
+        .config-status.success {
+            background-color: var(--success-light);
+            color: var(--success);
+        }
+
+        .config-status.error {
+            background-color: var(--error-light);
+            color: var(--error);
+        }
+
+        .config-status.warning {
+            background-color: var(--warning-light);
+            color: var(--warning);
+        }
+
+        .config-icon {
+            margin-right: 8px;
+        }
+
+        .config-details {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            width: 300px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 12px;
+            z-index: 10;
+        }
+
+        .config-container {
+            position: relative;
+        }
+
+        .config-container:hover .config-details {
+            display: block;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-right: 10px;
+            font-weight: 500;
+        }
+
+        .tab.active {
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .button-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 16px;
+            cursor: pointer;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        button:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background-color: var(--border);
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button .icon {
+            margin-right: 8px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .response-area {
+            background: var(--card-bg);
+            padding: 0;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+        }
+
+        .response-header {
+            padding: 15px 20px;
+            background-color: #f1f5f9;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        pre {
+            background: var(--card-bg);
+            padding: 20px;
+            overflow: auto;
+            max-height: 400px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #1a202c;
+        }
+
+        .error-container {
+            color: var(--error);
+            background-color: var(--error-light);
+            border: 1px solid #fc8181;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stats-card {
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .card-value {
+            font-size: 28px;
+            font-weight: bold;
+            margin: 5px 0;
+            color: var(--primary-dark);
+        }
+
+        .card-label {
+            font-size: 14px;
+            color: var(--text-light);
+            text-align: center;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            color: var(--info);
+            font-style: italic;
+            width: 100%;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(66, 153, 225, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--info);
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 12px 15px;
+            background-color: var(--info-light);
+            border-radius: 5px;
+            font-size: 15px;
+        }
+
+        .status.success {
+            background-color: var(--success-light);
+            color: var(--success);
+        }
+
+        .status.error {
+            background-color: var(--error-light);
+            color: var(--error);
+        }
+
+        .status.warning {
+            background-color: var(--warning-light);
+            color: var(--warning);
+        }
+
+        .debug-section {
+            margin-top: 20px;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .debug-header {
+            background-color: #f1f5f9;
+            padding: 12px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+        }
+
+        .debug-content {
+            max-height: 300px;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .debug-content.collapsed {
+            max-height: 0;
+        }
+
+        .debug-log {
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #1a202c;
+            color: #a0aec0;
+            padding: 10px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .debug-log p {
+            margin: 2px 0;
+            display: flex;
+        }
+
+        .debug-time {
+            color: #718096;
+            margin-right: 8px;
+            opacity: 0.7;
+            flex-shrink: 0;
+        }
+
+        .debug-error {
+            color: #fc8181;
+        }
+
+        .debug-success {
+            color: #68d391;
+        }
+
+        .debug-warning {
+            color: #f6ad55;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+
+        @media (max-width: 768px) {
+            .stats-container {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stats-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .button-container {
+                flex-direction: column;
+            }
+            
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Zendesk API Test Dashboard</h1>
+        <div class="config-container">
+            <div class="config-status" id="configStatus">
+                <span class="config-icon">⚙️</span>
+                <span>Checking configuration...</span>
+            </div>
+            <div class="config-details" id="configDetails">
+                <h3>Server Configuration</h3>
+                <div id="configDetailsList"></div>
+            </div>
+        </div>
+    </header>
+
+    <div class="tabs">
+        <div class="tab active" data-tab="operations">Operations</div>
+        <div class="tab" data-tab="statistics">Statistics</div>
+        <div class="tab" data-tab="reports">Reports</div>
+    </div>
+
+    <div class="tab-content active" id="operations">
+        <div class="button-container">
+            <button id="btnHealth">
+                <span class="icon">🔌</span>
+                Test Connection
+            </button>
+            <button id="btnCallCenter">
+                <span class="icon">📞</span>
+                Get Call Center Tickets
+            </button>
+            <button id="btnAllTickets">
+                <span class="icon">🎫</span>
+                Get All Tickets
+            </button>
+            <button id="btnDebug">
+                <span class="icon">🛠</span>
+                Check API Configuration
+            </button>
+        </div>
+    </div>
+
+    <div class="tab-content" id="statistics">
+        <div class="card">
+            <div class="card-header">
+                <h2>Ticket Statistics</h2>
+                <button id="btnStatistics">
+                    <span class="icon">📊</span>
+                    Get Statistics
+                </button>
+            </div>
+            <div id="statistics-container" class="stats-container">
+                <p>Click the button to load statistics.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-content" id="reports">
+        <div class="card">
+            <div class="card-header">
+                <h2>Call Center Reports</h2>
+                <button id="btnReports">
+                    <span class="icon">📋</span>
+                    Get Reports
+                </button>
+            </div>
+            <div id="reports-container">
+                <p>Click the button to load call center reports.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="status-container"></div>
+
+    <div class="response-area">
+        <div class="response-header">
+            <h2>Response</h2>
+            <div class="controls">
+                <button class="btn-sm" id="btnClearResponse">Clear</button>
+            </div>
+        </div>
+        <pre id="response">No data fetched yet</pre>
+    </div>
+
+    <div class="debug-section">
+        <div class="debug-header" id="debugHeader">
+            <h3>Debug Information</h3>
+            <div class="controls">
+                <button class="btn-sm" id="btnClearLog">Clear Log</button>
+                <button class="btn-sm" id="btnToggleLog">Hide</button>
+            </div>
+        </div>
+        <div class="debug-content" id="debugContent">
+            <div class="debug-log" id="debugLog"></div>
+        </div>
+    </div>
+
+    <script>
+        const apiBaseUrl = 'http://localhost:3000/api';
+        const responseElement = document.getElementById('response');
+        const statsContainer = document.getElementById('statistics-container');
+        const reportsContainer = document.getElementById('reports-container');
+        const statusContainer = document.getElementById('status-container');
+        const debugLog = document.getElementById('debugLog');
+        const configStatus = document.getElementById('configStatus');
+        const configDetailsList = document.getElementById('configDetailsList');
+        const debugContent = document.getElementById('debugContent');
+        
+        // Tab functionality
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+            });
+        });
+        
+        // Toggle debug log
+        document.getElementById('btnToggleLog').addEventListener('click', (e) => {
+            debugContent.classList.toggle('collapsed');
+            e.target.textContent = debugContent.classList.contains('collapsed') ? 'Show' : 'Hide';
+        });
+        
+        // Clear response
+        document.getElementById('btnClearResponse').addEventListener('click', () => {
+            responseElement.textContent = 'No data fetched yet';
+        });
+        
+        // Clear debug log
+        document.getElementById('btnClearLog').addEventListener('click', () => {
+            debugLog.innerHTML = '';
+            log('Debug log cleared', 'info');
+        });
+        
+        // Debug logging
+        function log(message, type = 'info') {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-US', { hour12: false });
+            const msgEl = document.createElement('p');
+            
+            let messageContent = message;
+            // Escape HTML in message if it's a string
+            if (typeof message === 'string') {
+                messageContent = message
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            } else if (typeof message === 'object') {
+                try {
+                    messageContent = JSON.stringify(message);
+                } catch (err) {
+                    messageContent = String(message);
+                }
+            }
+            
+            msgEl.innerHTML = `<span class="debug-time">${timeStr}</span>`;
+            
+            if (type === 'error') {
+                msgEl.innerHTML += `<span class="debug-error">${messageContent}</span>`;
+            } else if (type === 'success') {
+                msgEl.innerHTML += `<span class="debug-success">${messageContent}</span>`;
+            } else if (type === 'warning') {
+                msgEl.innerHTML += `<span class="debug-warning">${messageContent}</span>`;
+            } else {
+                msgEl.innerHTML += messageContent;
+            }
+            
+            debugLog.appendChild(msgEl);
+            debugLog.scrollTop = debugLog.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${messageContent}`);
+        }
+        
+        // Show status message
+        function showStatus(message, type = 'info') {
+            statusContainer.innerHTML = `<div class="status ${type}">${message}</div>`;
+            // Auto clear after 10 seconds
+            setTimeout(() => {
+                statusContainer.innerHTML = '';
+            }, 10000);
+        }
+        
+        // Enable/disable all buttons
+        function setButtonsState(disabled) {
+            document.querySelectorAll('button:not(.btn-sm)').forEach(btn => {
+                btn.disabled = disabled;
+            });
+        }
+        
+        // Show loading state
+        function setLoading() {
+            responseElement.innerHTML = '<div class="loading"><div class="spinner"></div>Loading data...</div>';
+            setButtonsState(true);
+        }
+        
+        // Display API response
+        function displayResponse(data) {
+            try {
+                // Format JSON with syntax highlighting
+                const formatted = JSON.stringify(data, null, 2);
+                responseElement.textContent = formatted;
+                responseElement.classList.remove('error');
+                setButtonsState(false);
+            } catch (err) {
+                log(`Error formatting response: ${err.message}`, 'error');
+                responseElement.textContent = typeof data === 'string' ? data : 'Error: Could not display response';
+                responseElement.classList.add('error');
+            }
+        }
+        
+        // Display error message
+        function displayError(message, details = '') {
+            responseElement.innerHTML = `<div class="error-container"><strong>Error:</strong> ${message}</div>`;
+            if (details) {
+                responseElement.innerHTML += `<div class="error-details">${details}</div>`;
+            }
+            setButtonsState(false);
+        }
+        
+        // Display statistics cards
+        function displayStatistics(stats) {
+            statsContainer.innerHTML = '';
+            
+            if (!stats) {
+                log('No statistics data available', 'error');
+                statsContainer.innerHTML = '<p>No statistics data available</p>';
+                return;
+            }
+            
+            // Create cards for main metrics
+            const metrics = [
+                { label: 'Total Tickets', value: stats.total },
+                { label: 'Open', value: stats.open },
+                { label: 'Pending', value: stats.pending },
+                { label: 'Solved', value: stats.solved },
+                { label: 'Closed', value: stats.closed },
+                { label: 'Avg Response (min)', value: stats.avgResponseTime },
+                { label: 'Avg Resolution (min)', value: stats.avgResolutionTime },
+                { label: 'SLA Compliance', value: stats.slaCompliance + '%' }
+            ];
+            
+            metrics.forEach(metric => {
+                const card = document.createElement('div');
+                card.className = 'stats-card';
+                card.innerHTML = `
+                    <div class="card-value">${metric.value}</div>
+                    <div class="card-label">${metric.label}</div>
+                `;
+                statsContainer.appendChild(card);
+            });
+            
+            log('Statistics rendered successfully', 'success');
+        }
+        
+        // Display reports list
+        function displayReports(reports) {
+            reportsContainer.innerHTML = '';
+            
+            if (!reports || reports.length === 0) {
+                reportsContainer.innerHTML = '<p>No reports available</p>';
+                return;
+            }
+            
+            const reportsList = document.createElement('div');
+            reportsList.style.marginTop = '20px';
+            
+            reports.forEach(report => {
+                const reportItem = document.createElement('div');
+                reportItem.style.padding = '12px';
+                reportItem.style.borderBottom = '1px solid #edf2f7';
+                reportItem.style.display = 'flex';
+                reportItem.style.justifyContent = 'space-between';
+                reportItem.style.alignItems = 'center';
+                
+                const date = new Date(report.reportDate).toLocaleDateString();
+                
+                reportItem.innerHTML = `
+                    <div>
+                        <div><strong>${report.fileName}</strong></div>
+                        <div style="color: #718096; font-size: 14px;">Ticket #${report.ticketId} - ${date}</div>
+                    </div>
+                    <div>
+                        <button class="btn-sm" data-filename="${report.fileName}">Download</button>
+                    </div>
+                `;
+                
+                reportsList.appendChild(reportItem);
+            });
+            
+            reportsContainer.appendChild(reportsList);
+            
+            // Add event listeners to download buttons
+            reportsList.querySelectorAll('button').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const filename = btn.dataset.filename;
+                    window.open(`${apiBaseUrl}/tickets/reports/${filename}/download`, '_blank');
+                });
+            });
+        }
+        
+        // Fetch API with better error handling
+        // Replace the fetchApi function with this one
+async function fetchApi(endpoint, errorMessage = 'Failed to fetch data') {
+    setLoading();
+    
+    try {
+        log(`Fetching ${apiBaseUrl}${endpoint}`);
+        
+        const response = await fetch(`${apiBaseUrl}${endpoint}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            mode: 'cors', // Add this line
+            credentials: 'omit' // Change from 'include' to 'omit'
+        });
+        
+        // Rest of the function stays the same
+        log(`Response status: ${response.status}`);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            log(`Server error: ${errorText}`, 'error');
+            throw new Error(`Server returned ${response.status}: ${errorText}`);
+        }
+        
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            log(`Warning: Non-JSON response: ${contentType}`, 'error');
+        }
+        
+        const data = await response.json();
+        log('Data fetched successfully', 'success');
+        return data;
+    } catch (error) {
+        log(`Error: ${error.message}`, 'error');
+        
+        if (error.message.includes('Failed to fetch')) {
+            displayError('Network Error', 'Could not connect to the server. Make sure the backend is running and accessible.');
+            showStatus('Cannot connect to the backend server. Please check if it\'s running at http://localhost:3000', 'error');
+        } else {
+            displayError(errorMessage, error.message);
+        }
+        
+        throw error;
+    } finally {
+        setButtonsState(false);
+    }
+}
+        
+        // Check server configuration
+        async function checkServerConfig() {
+            try {
+                configStatus.innerHTML = `
+                    <span class="config-icon">⚙️</span>
+                    <span>Checking configuration...</span>
+                `;
+                
+                const response = await fetch(`${apiBaseUrl}/tickets/debug`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    mode: 'cors', // Add this
+                    credentials: 'omit' // Change to omit
+                });
+                
+                if (!response.ok) {
+                    log(`Server configuration check failed: ${response.status}`, 'error');
+                    configStatus.innerHTML = `
+                        <span class="config-icon">⚠️</span>
+                        <span>Configuration check failed</span>
+                    `;
+                    configStatus.className = 'config-status error';
+                    return false;
+                }
+                
+                const data = await response.json();
+                log('Server configuration received', 'info');
+                
+                configDetailsList.innerHTML = '';
+                let allConfigured = true;
+                let numMissing = 0;
+                
+                // Add configuration details
+                for (const [key, value] of Object.entries(data.config)) {
+                    const isConfigured = value.includes('✓');
+                    const msgType = isConfigured ? 'success' : 'error';
+                    
+                    if (!isConfigured) {
+                        allConfigured = false;
+                        numMissing++;
+                    }
+                    
+                    const item = document.createElement('div');
+                    item.style.margin = '8px 0';
+                    item.style.display = 'flex';
+                    item.style.justifyContent = 'space-between';
+                    
+                    item.innerHTML = `
+                        <div>${key}</div>
+                        <div style="color: ${isConfigured ? 'var(--success)' : 'var(--error)'}">
+                            ${value}
+                        </div>
+                    `;
+                    
+                    configDetailsList.appendChild(item);
+                    log(`${key}: ${value}`, msgType);
+                }
+                
+                // Update the config status indicator
+                if (allConfigured) {
+                    configStatus.innerHTML = `
+                        <span class="config-icon">✅</span>
+                        <span>API fully configured</span>
+                    `;
+                    configStatus.className = 'config-status success';
+                    showStatus('Server is properly configured. All API features should work.', 'success');
+                } else {
+                    configStatus.innerHTML = `
+                        <span class="config-icon">⚠️</span>
+                        <span>${numMissing} configuration items missing</span>
+                    `;
+                    configStatus.className = 'config-status warning';
+                    showStatus('Server is running but Zendesk API is not fully configured. Check the configuration details.', 'warning');
+                }
+                
+                return allConfigured;
+            } catch (error) {
+                log(`Error checking server configuration: ${error.message}`, 'error');
+                
+                configStatus.innerHTML = `
+                    <span class="config-icon">❌</span>
+                    <span>Configuration unavailable</span>
+                `;
+                configStatus.className = 'config-status error';
+                
+                return false;
+            }
+        }
+        
+        // Test server connection
+        async function testConnection() {
+            try {
+                log('Testing connection to backend server...');
+                
+                const response = await fetch(`${apiBaseUrl}/health`, { 
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    mode: 'cors', // Add this
+                    credentials: 'omit' // Change to omit
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`Backend connection test successful: ${JSON.stringify(data)}`, 'success');
+                    showStatus('Connected to backend server successfully', 'success');
+                    
+                    // Check server configuration
+                    await checkServerConfig();
+                    
+                } else {
+                    log(`Backend connection test failed: Status ${response.status}`, 'error');
+                    showStatus('Cannot connect to the backend server', 'error');
+                    
+                    configStatus.innerHTML = `
+                        <span class="config-icon">❌</span>
+                        <span>Server connection failed</span>
+                    `;
+                    configStatus.className = 'config-status error';
+                }
+            } catch (error) {
+                log(`Backend connection test failed: ${error.message}`, 'error');
+                showStatus('Cannot connect to the backend server. Make sure it\'s running at http://localhost:3000', 'error');
+                
+                configStatus.innerHTML = `
+                    <span class="config-icon">❌</span>
+                    <span>Server connection failed</span>
+                `;
+                configStatus.className = 'config-status error';
+            }
+        }
+        
+        // Button event handlers
+        document.getElementById('btnHealth').addEventListener('click', async () => {
+            try {
+                const data = await fetchApi('/health', 'Connection test failed');
+                displayResponse(data);
+                showStatus('Server connection successful!', 'success');
+            } catch (error) {
+                // Error handling is done in fetchApi
+            }
+        });
+        
+        document.getElementById('btnCallCenter').addEventListener('click', async () => {
+            try {
+                const data = await fetchApi('/tickets/callcenter', 'Failed to get call center tickets');
+                displayResponse(data);
+                
+                if (data.success) {
+                    showStatus(`Successfully fetched ${data.tickets?.length || 0} call center tickets!`, 'success');
+                } else {
+                    showStatus(data.message || 'Failed to fetch call center tickets', 'error');
+                }
+            } catch (error) {
+                // Error handling is done in fetchApi
+            }
+        });
+        
+        document.getElementById('btnAllTickets').addEventListener('click', async () => {
+            try {
+                const data = await fetchApi('/tickets', 'Failed to get tickets');
+                displayResponse(data);
+                
+                if (data.success) {
+                    showStatus(`Successfully fetched ${data.tickets?.length || 0} tickets!`, 'success');
+                } else {
+                    showStatus(data.message || 'Failed to fetch tickets', 'error');
+                }
+            } catch (error) {
+                // Error handling is done in fetchApi
+            }
+        });
+        
+        document.getElementById('btnStatistics').addEventListener('click', async () => {
+            try {
+                const data = await fetchApi('/tickets/stats/summary', 'Failed to get ticket statistics');
+                displayResponse(data);
+                
+                if (data.success && data.statistics) {
+                    displayStatistics(data.statistics);
+                    showStatus('Successfully fetched ticket statistics!', 'success');
+                } else {
+                    log('Statistics data not found in response', 'error');
+                    showStatus('Statistics data not available in response', 'error');
+                }
+            } catch (error) {
+                // Error handling is done in fetchApi
+            }
+        });
+        
+        document.getElementById('btnReports').addEventListener('click', async () => {
+            try {
+                const data = await fetchApi('/tickets/reports', 'Failed to get call center reports');
+                displayResponse(data);
+                
+                if (data.success && data.reports) {
+                    displayReports(data.reports);
+                    showStatus(`Successfully fetched ${data.reports?.length || 0} call center reports!`, 'success');
+                } else {
+                    showStatus(data.message || 'No reports available', 'warning');
+                }
+            } catch (error) {
+                // Error handling is done in fetchApi
+            }
+        });
+        
+        document.getElementById('btnDebug').addEventListener('click', async () => {
+            await checkServerConfig();
+        });
+        
+        // Run connection test on load
+        testConnection();
+    </script>
+</body>
+</html>
