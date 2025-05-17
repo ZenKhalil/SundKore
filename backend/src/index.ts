@@ -4,6 +4,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import dotenv from "dotenv";
 import callsRouter from "./routes/calls.route";
+import ticketsRoutes from "./routes/tickets.route";
 
 // Load environment variables
 dotenv.config();
@@ -14,10 +15,12 @@ const PORT = process.env.PORT || 3000;
 // Configure CORS to allow your frontend
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://localhost:3000"],
-    credentials: true,
+    origin: "*", // Allow all origins while debugging
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+    credentials: false, // Important! Set to false when using mode: 'cors'
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   })
 );
 
@@ -29,6 +32,7 @@ app.use(morgan("dev"));
 
 // Routes
 app.use("/api/calls", callsRouter);
+app.use("/api/tickets", ticketsRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
